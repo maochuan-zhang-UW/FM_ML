@@ -1,0 +1,17 @@
+# Data directories (large binary files — not tracked)
+02-data/
+
+# Saved models
+06-models/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# Temporary files
+05-tmp/
