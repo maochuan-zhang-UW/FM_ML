@@ -13,9 +13,8 @@ automatic P-wave first-motion polarity picking to support focal mechanism
 analysis.  Seven OBS stations at Axial Seamount are used:
 AS1, AS2, CC1, EC1, EC2, EC3, ID1.
 
-The original development scripts (prefixed L_, M_, N_, O_) live in
-`01-scripts/` for reference.  All active, publication-ready scripts are in
-`scripts/` (see Workflow Pipeline below).
+All active, publication-ready scripts live in `01-scripts/`, organized by
+pipeline stage.
 
 ## Environment Setup
 
@@ -30,73 +29,83 @@ All scripts are run as standalone Python scripts from the repository root
 (`FM_ML/`):
 
 ```bash
-python scripts/<subdir>/<script_name>.py
+python 01-scripts/<subdir>/<script_name>.py
 ```
 
 There is no build system, test suite, or linter configured.
 
 ## Workflow Pipeline
 
-Scripts live in `scripts/` organized by pipeline stage:
+Scripts live in `01-scripts/` organized by pipeline stage.  There are two
+parallel pipelines: the **NPY pipeline** (paper workflow) and the
+**H5 pipeline** (experimental HDF5-based alternative).
+
+### NPY Pipeline (paper workflow)
 
 ```
-scripts/
+01-scripts/
   data_preparation/
     01_build_training_dataset.py      # augment + crop + split unified dataset
     02_build_eval_dataset.py          # build standalone eval set
     03_build_loso_training_dataset.py # augment + crop + split LOSO dataset
     04_build_loso_eval_dataset.py     # build LOSO eval set
   benchmark/
-    eval_polarcap_baseline.py         # evaluate PolarCAP and other baselines
+    eval_polarcap_baseline.py         # evaluate PolarCAP baseline
   training/
     train_axialpolcap.py              # train unified AxialPolCap model
     train_loso.py                     # LOSO cross-validation training
     transfer_learning.py              # transfer learning experiments
   evaluation/
-    eval_model.py                     # evaluate unified model on test split
     eval_loso.py                      # evaluate LOSO models
     eval_transfer_learning.py         # evaluate transfer-learning models
   application/
     apply_to_catalog.py               # apply to 2015-2021 Axial Seamount catalog
 ```
 
-### Key script descriptions
+### H5 Pipeline (HDF5-based alternative)
+
+```
+01-scripts/
+  convert_mat_to_h5.py               # convert .mat templates → A_wave_train.h5 / A_wave_val.h5
+  split_h5_train_val.py              # split HDF5 dataset into train/val
+  data_preparation/
+    01_build_training_dataset_h5.py  # augment from H5; outputs TMSF_Tra_002/train_dataset.h5
+    02_build_eval_dataset_h5.py      # augment val set; outputs TMSF_Val_002/val_dataset.h5
+    03_build_eval_dataset_h5_sigma001.py  # variant with σ=0.01 s time shift
+  training/
+    train_axialpolcap_h5.py          # train from H5 datasets; 80/10/10 split internal
+  evaluation/
+    eval_model.py                    # evaluate H5-trained model; uses h5py, CPU-only (Metal crashes)
+```
+
+### Key NPY script descriptions
 
 **01_build_training_dataset.py**
-Replaces K_augument_mimic_org.m + L4_saveNPY_TMSF_001tran.py.
-Reads directly from `Template_divide.mat`; fits a lognormal distribution to
-per-station empirical SNR values; augments each template to reach ~15,000
-samples per station; applies cubic-spline time shifts
-(Normal(0, sigma=2 samples at 200 Hz)); center-crops 200->64 samples;
-max-normalizes; stratified 80/10/10 split; saves to
-`02-data/K_aug/TMSF_Tra_001/`.
+Reads from `Template_divide.mat`; fits a lognormal distribution to per-station
+empirical SNR values; augments each template to reach ~15,000 samples per
+station; applies cubic-spline time shifts (Normal(0, sigma=2 samples at 200 Hz));
+center-crops 200→64 samples; max-normalizes; stratified 80/10/10 split;
+saves to `02-data/K_aug/TMSF_Tra_001/`.
 
 **03_build_loso_training_dataset.py**
-Replaces K_augument_all_step_SNRdis.m + L_saveNPY.py.
 Reads from `Template.mat`; uses last 20% of each station's events;
 step-SNR distribution (10% in [0,5] dB, 80% in [5,35] dB, 10% in [35,50] dB);
-base_multi_trace=20 (ID1 gets 3x); no time shift; saves to
+base_multi_trace=20 (ID1 gets 3×); no time shift; saves to
 `02-data/K_aug/STEP010/`.
 
-**02_build_eval_dataset.py** (was L3_saveNPY_TMSF_001_val.py)
-Reads from the paired validation `.mat` files; no augmentation; saves
+**02_build_eval_dataset.py**
+Reads from paired validation `.mat` files; no augmentation; saves
 `timeseries_{STA}.npy` / `polarities_{STA}.npy` without a split prefix.
 
-**04_build_loso_eval_dataset.py** (was L2_saveNPY_val.py)
-Same as 02 but for the LOSO evaluation set.
-
-**train_axialpolcap.py** (was M3_trainModel_newData.py)
+**train_axialpolcap.py**
 Trains on merged all-station data from `K_aug/TMSF_Tra_001/`; saves JSON
 training history + ROC curves; uses timestamped model filenames.
 
-**train_loso.py** (was M_trainLOSO_CV.py)
+**train_loso.py**
 LOSO training on `K_aug/STEP010/`; saves one model per held-out station as
 `PolarPicker_LOSO_{STA}.keras`.
-
-### Legacy scripts
-
-`01-scripts/` contains earlier development iterations (prefixed L_, M_, N_,
-O_) kept for reference only.  Do not run them on the paper datasets.
+**Gotcha**: the `stations` list is hardcoded to `['EC2','EC3','ID1']` — change
+to all 7 stations before running a full LOSO sweep.
 
 ## Model Architecture (AxialPolCap)
 
@@ -113,7 +122,7 @@ Defined via `build_polarPicker()` in each training script.  It is a
   Huber loss, weight=200
 - **Outputs**: `[decoder, classifier]`; prediction uses `model.predict(X)[1]`
 
-The heavy loss weighting on the classifier (200x) means the encoder learns
+The heavy loss weighting on the classifier (200×) means the encoder learns
 representations driven by polarity discrimination, not just waveform
 reconstruction.
 
@@ -153,19 +162,22 @@ overwritten with a 4-element array
 
 ```
 FM_ML/
-  scripts/                    # Active publication scripts
+  01-scripts/                 # Active publication scripts
     data_preparation/
     benchmark/
     training/
     evaluation/
     application/
-  01-scripts/                 # Legacy development scripts (reference only)
-  02-data/                    # Input .mat files and converted .npy datasets
+    convert_mat_to_h5.py      # H5 pipeline utility
+    split_h5_train_val.py     # H5 pipeline utility
+  02-data/                    # Input .mat files and converted .npy / .h5 datasets
     K_aug/
       Template_divide.mat     # Templates for unified training (01_build_...)
       Template.mat            # All templates (03_build_... uses last 20%)
       STEP010/                # LOSO training .npy output
-      TMSF_Tra_001/           # Unified training .npy output
+      TMSF_Tra_001/           # Unified NPY training output
+      TMSF_Tra_002/           # H5 pipeline training output (train_dataset.h5)
+      TMSF_Val_002/           # H5 pipeline val output (val_dataset.h5)
     H_noi/
       H_Noise_200.mat         # Noise waveforms (200 samples, 200 Hz)
       H_noise_dB20_snrValue.mat  # Empirical per-station SNR distributions
@@ -197,6 +209,9 @@ FM_ML/
 - Use `scipy.io.loadmat(path, struct_as_record=False, squeeze_me=True)` to
   load MATLAB struct arrays; access fields with `getattr(struct_obj, 'field')`.
   Do NOT use `eval()` — use `mat_dict[station_name]` or `getattr()` instead.
+- `eval_model.py` disables GPU (`tf.config.set_visible_devices([], 'GPU')`)
+  because the Metal plugin crashes on `model.predict` — keep this for
+  macOS inference scripts.
 - Data from HPC (Tallgrass cluster) uses absolute paths like
   `/caldera/projects/...`; local paths use
   `/Users/mcZhang/Documents/GitHub/FM_ML/`.
