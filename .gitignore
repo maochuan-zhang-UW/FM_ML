@@ -1,0 +1,14 @@
+# Data / binaries
+*.mat
+*.mp4
+*.png
+*.pdf
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
