@@ -60,6 +60,7 @@ parallel pipelines: the **NPY pipeline** (paper workflow) and the
     eval_transfer_learning.py         # evaluate transfer-learning models
   application/
     apply_to_catalog.py               # apply to 2015-2021 Axial Seamount catalog
+  make_manuscript_figures.py          # regenerate all 14 manuscript figures → 03-figs/
 ```
 
 ### H5 Pipeline (HDF5-based alternative)
@@ -101,11 +102,30 @@ Reads from paired validation `.mat` files; no augmentation; saves
 Trains on merged all-station data from `K_aug/TMSF_Tra_001/`; saves JSON
 training history + ROC curves; uses timestamped model filenames.
 
+**04_build_loso_eval_dataset.py**
+Reads from paired LOSO validation `.mat` files; no augmentation; saves
+`timeseries_{STA}.npy` / `polarities_{STA}.npy` (no split prefix) to
+`02-data/K_aug/Val/`.
+
 **train_loso.py**
 LOSO training on `K_aug/STEP010/`; saves one model per held-out station as
 `PolarPicker_LOSO_{STA}.keras`.
 **Gotcha**: the `stations` list is hardcoded to `['EC2','EC3','ID1']` — change
 to all 7 stations before running a full LOSO sweep.
+
+**transfer_learning.py**
+Fine-tunes the external PolarCAP baseline (`06-models/PolarCAP.h5`, `.h5`
+format) on `TMSF_Tra_001/` data; saves as `PolarCAP_finetuned_TMSF.h5`.
+Runs CPU-only (Metal plugin crashes during fine-tuning on macOS).
+
+**make_manuscript_figures.py**
+Standalone Python replacement for the original MATLAB figure-generation
+scripts.  Reads data from sibling repos (`FM/`, `FM3/`, `FM4/`) as well as
+this repo's `02-data/` and `06-models/` directories.  Outputs
+`03-figs/Figure01_python.png` through `Figure14_python.png`.  Run with
+`python 01-scripts/make_manuscript_figures.py`; pass `--figures 1 3 5` to
+regenerate only specific figures.  Requires `cartopy` for the map panel
+(Figure 1).
 
 ## Model Architecture (AxialPolCap)
 
@@ -176,13 +196,16 @@ FM_ML/
       Template.mat            # All templates (03_build_... uses last 20%)
       STEP010/                # LOSO training .npy output
       TMSF_Tra_001/           # Unified NPY training output
+      TMSF_Val_001/           # Eval set for transfer-learning evaluation
+      Val/                    # LOSO eval set (no split prefix; from 04_build_loso_eval_dataset.py)
       TMSF_Tra_002/           # H5 pipeline training output (train_dataset.h5)
       TMSF_Val_002/           # H5 pipeline val output (val_dataset.h5)
     H_noi/
       H_Noise_200.mat         # Noise waveforms (200 samples, 200 Hz)
       H_noise_dB20_snrValue.mat  # Empirical per-station SNR distributions
-  03-figs/                    # Output figures (confusion matrices, ROC curves)
+  03-figs/                    # Output figures (confusion matrices, ROC curves, manuscript PNGs)
     LOSO_010/                 # LOSO confusion matrices
+    Figure{01-14}_python.png  # manuscript figures from make_manuscript_figures.py
   04-logs/                    # Log files
   05-tmp/                     # Temporary outputs (training history CSVs)
   06-models/                  # Saved Keras models (.keras format)
@@ -209,9 +232,11 @@ FM_ML/
 - Use `scipy.io.loadmat(path, struct_as_record=False, squeeze_me=True)` to
   load MATLAB struct arrays; access fields with `getattr(struct_obj, 'field')`.
   Do NOT use `eval()` — use `mat_dict[station_name]` or `getattr()` instead.
-- `eval_model.py` disables GPU (`tf.config.set_visible_devices([], 'GPU')`)
-  because the Metal plugin crashes on `model.predict` — keep this for
-  macOS inference scripts.
+- **macOS GPU crash**: The TF-Metal plugin crashes during `model.predict` and
+  fine-tuning.  `eval_model.py`, `transfer_learning.py`, and
+  `eval_transfer_learning.py` all call
+  `tf.config.set_visible_devices([], 'GPU')` at startup — keep this pattern
+  in any new macOS inference or fine-tuning script.
 - Data from HPC (Tallgrass cluster) uses absolute paths like
   `/caldera/projects/...`; local paths use
   `/Users/mcZhang/Documents/GitHub/FM_ML/`.
