@@ -1,8 +1,8 @@
 # Data directories (large binary files — not tracked)
 02-data/
 
-# Saved models
-06-models/
+# Saved models (tracked)
+# 06-models/
 
 # Python cache
 __pycache__/
