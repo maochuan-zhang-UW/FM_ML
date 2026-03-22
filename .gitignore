@@ -3,6 +3,7 @@
 *.mp4
 *.png
 *.pdf
+*.asv
 
 # macOS
 .DS_Store

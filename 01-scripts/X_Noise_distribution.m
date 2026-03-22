@@ -1,6 +1,6 @@
 clear; % Clear workspace
 % Load data
-load('/Users/mczhang/Documents/GitHub/FM5_ML/02-data/A_wave/A_wave_forML1sec.mat');
+load('/Users/mczhang/Documents/GitHub/FM5_ML/02-data/A_wave/A_wave_forML1sec100hz.mat');
 numStructs = length(Felix);
 stations = {'AS1', 'AS2', 'CC1', 'EC1', 'EC2', 'EC3', 'ID1'};
 numStations = length(stations);

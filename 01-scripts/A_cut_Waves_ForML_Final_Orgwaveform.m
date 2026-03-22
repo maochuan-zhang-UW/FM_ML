@@ -19,11 +19,11 @@ end
 P.a.sttime = -3;
 P.a.edtime = 7;
 P.a.window = [-3 3];
-P.filt = 1; % Use the first filter band (e.g., [3 20] Hz), cuz small earthquakes are good 
+P.filt = 5; % Use the first filter band (e.g., [3 20] Hz), cuz small earthquakes are good 
 
 % Initialize missing waveform fields
-for i = 1:length(Felix)
-    for kz = 1:length(fields)
+for i = 1000:length(Felix)
+    for kz = 3:length(fields)
         fname = ['W_', fields{kz}];
         if ~isfield(Felix(i), fname)
             Felix(i).(fname) = 0;
@@ -44,24 +44,17 @@ for kz = 1:length(fields)
 
     tempFelix = Felix;  % Copy to avoid modifying inside parfor
 
+    % Use parallel loop for each event
     parfor i = 1:length(Felix)
         temp = 0;
+
         DDt_field = ['DDt_', field];
-
-        % Check if field exists and get the value
-        if isfield(tempFelix(i), DDt_field)
-            ddt_value = tempFelix(i).(DDt_field);
-
-            % Ensure it's a scalar and check the condition
-            if isscalar(ddt_value) && (ddt_value > -3)
-                trace_Z = obtain_waveforms_Z(tempFelix(i), kz, P.a.sttime, P.a.edtime, p);
-
-                if isfield(trace_Z, 'dataFilt') && size(trace_Z.dataFilt, 1) >= P.filt
-                    temp = trace_Z.dataFilt(idx_start:idx_end);
-                end
+        if isfield(Felix(i), DDt_field) & (Felix(i).(DDt_field) > -3)
+            trace_Z = obtain_waveforms_Z(Felix(i), kz, P.a.sttime, P.a.edtime, p);
+            if isfield(trace_Z, 'dataFilt') && size(trace_Z.dataFilt, 2) >= P.filt
+                temp = trace_Z.dataFilt(idx_start:idx_end, P.filt);
             end
         end
-
         % Assign result
         tempFelix(i).(['W_', field]) = temp;
     end
@@ -73,7 +66,7 @@ end
 fprintf('Total processing time: %.2f seconds\n', toc(overall_tic));
 
 % Save the results
-save('/Users/mczhang/Documents/GitHub/FM5_ML/02-data/A_Wave/A_wave_forML6sec.mat', 'Felix');
+save('/Users/mczhang/Documents/GitHub/FM5_ML/02-data/A_Wave/A_wave_forML_org.mat', 'Felix');
 
 % %% downsample
 % % Downsample waveforms from 200 Hz to 100 Hz (factor of 2)
