@@ -744,7 +744,6 @@ def figure_02(paths: Paths, outdir: Path) -> Path:
             axes[0, i].set_ylabel("Normalized amplitude")
             axes[1, i].set_ylabel("Normalized amplitude")
         axes[1, i].set_xlabel("Time (s)")
-    fig.suptitle("Figure 2: Template and noise waveforms by station", fontsize=14)
     out = outdir / "Figure02_python.png"
     save_figure(fig, out)
     return out
