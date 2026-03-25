@@ -804,7 +804,7 @@ def figure_03(paths: Paths, outdir: Path) -> Path:
         if k == 0:
             syn = signal.copy()
         else:
-            target_db = lognorm.rvs(shape, loc=loc, scale=scale, random_state=rng)
+            target_db = float(rng.uniform(2, 45))
             valid = False
             while not valid:
                 n = noise[rng.integers(0, len(noise))]
