@@ -1,5 +1,6 @@
 # Data / binaries
 *.mat
+!02-data/A_wave/A_wave_dB20_cleaned.mat
 *.mp4
 *.png
 *.pdf
