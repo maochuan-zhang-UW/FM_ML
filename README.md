@@ -275,8 +275,8 @@ The `02-data/` directory is **not** included in this repository.
 
 ## Citation
 
-Manuscript in review. Citation will be added upon publication.
+Manuscript in preparation. Citation will be added upon publication.
 
-Zhang, M., Wilcock, W. S. D., Denolle, M., Waldhauser, F., Wang, K., Tolstoy, M., & Tan, Y. J. (in review). *Adapting Deep Learning for P-Wave Polarity Classification in Marine OBS Environments: Application to Real-Time Focal Mechanism Monitoring at Axial Seamount.*
+Zhang, M., Wilcock, W. S. D., Denolle, M., Waldhauser, F., Wang, K., Tolstoy, M., & Tan, Y. J. (in prep.). *Adapting Deep Learning for P-Wave Polarity Classification in Marine OBS Environments: Application to Real-Time Focal Mechanism Monitoring at Axial Seamount.*
 
 Corresponding author: Maochuan Zhang ([mczhang8@uw.edu](mailto:mczhang8@uw.edu))
