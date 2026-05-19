@@ -1,6 +1,6 @@
 # AxialPolCap
 
-**Extending Deep-Learning P-Wave Polarity Classification to Seafloor Microearthquakes at Axial Seamount**
+**Adapting Deep Learning for P-Wave Polarity Classification in Marine OBS Environments: Application to Real-Time Focal Mechanism Monitoring at Axial Seamount**
 
 Maochuan Zhang¹, William S. D. Wilcock¹, Marine Denolle¹, Felix Waldhauser², Kaiwen Wang⁴, Maya Tolstoy¹, Yen Joe Tan³
 
@@ -13,7 +13,7 @@ Maochuan Zhang¹, William S. D. Wilcock¹, Marine Denolle¹, Felix Waldhauser²,
 
 ## Abstract
 
-Determining P-wave first-motion polarity is essential for constraining focal mechanisms and understanding earthquake rupture processes. However, existing deep learning approaches are primarily trained on continental seismic networks and often perform poorly in marine environments where elevated noise levels, strong site effects, and variable couplings challenge model generalization. This study develops the first deep learning framework to advance polarity determination in oceanic settings, using data from the Ocean Observatories Initiative (OOI) Regional Cabled Array at Axial Seamount in the Pacific Ocean. Waveform cross-correlation-based and deep learning methods are employed, training exclusively on a high-SNR, manually verified subset of Axial Seamount waveforms augmented with realistic noise extracted from the OOI catalog, then applying the trained models to the remaining catalog-scale data. The newly developed model, **AxialPolCap**, incorporates data augmentation with waveform time-shift perturbations and demonstrates superior performance compared to existing approaches. When evaluated on test data with larger time shifts, AxialPolCap achieves approximately **96% accuracy** compared to 80–85% for previous deep learning models, outperforming manually-picked polarity accuracy of 90% and cross-correlation-derived accuracy of 92%. Application to continuous seismic data recorded at Axial Seamount between 2015 and 2021 yields a consistent catalog of P-wave polarities for determining focal mechanisms, facilitating interpretation of recent volcanic activity at this active submarine volcano.
+Determining P-wave first-motion polarity is essential for constraining focal mechanisms and understanding earthquake rupture processes. However, existing deep learning approaches are primarily trained on continental seismic networks and often perform poorly in marine environments where elevated noise levels, strong site effects, and variable couplings challenge model generalization. This study develops, to our knowledge, the first deep learning framework to advance polarity determination in oceanic settings, using data from the Ocean Observatories Initiative (OOI) Regional Cabled Array at Axial Seamount in the Pacific Ocean. We employ waveform cross-correlation-based and deep learning methods, training exclusively on a high-SNR, manually verified subset of Axial Seamount waveforms augmented with realistic noise extracted from the OOI catalog, and apply the trained models to the remaining catalog-scale data. Our newly developed model, **AxialPolCap**, incorporates data augmentation with waveform time-shift perturbations and demonstrates superior performance compared to existing approaches. On a held-out synthetic test set with realistic P-wave timing perturbations, AxialPolCap achieves approximately **96% polarity accuracy**, compared to 80–85% for existing deep-learning models and 92% for cross-correlation, both exceeding the ~90% inter-analyst consistency reported for manual picking (Hardebeck & Shearer, 2002). Leave-one-station-out cross-validation, in which the model is trained on six stations and tested on the seventh in turn, yields **96–98% accuracy** on unshifted waveforms across all held-out stations, confirming that the model generalizes without station-specific retraining. When applied to the independent 2015–2021 Axial Seamount catalog, AxialPolCap polarities agree with cross-correlation-derived polarities for **~88%** of picks and the resulting focal mechanisms match cross-correlation-based solutions with a **median Kagan angle of ~13°**, supporting the reliability of the approach for large-scale and real-time applications.
 
 ---
 
@@ -91,13 +91,30 @@ Training with P-wave pick time shifts (σ = 0.01–0.02 s via cubic-spline inter
 
 ---
 
-## Results: application to 2015–2021 catalog (§4)
+## Results: application to 2015–2021 catalog (§4.1)
 
 - Applied to all catalog waveforms not used in training/validation; preprocessing identical to training (demeaned, detrended, 3–20 Hz bandpass, max-normalized, 0.64 s window centered on P-pick).
 - Quality filter: confidence ≥ 0.8 AND entropy ≤ 0.2 → 200,578 accepted polarities (~66% of all P-wave picks).
 - Agreement with CC method: **~87.70%** across all stations and years.
 - Focal mechanism comparison: **median Kagan angle ~13°** between AxialPolCap-derived and CC-derived mechanisms (comparable to expected uncertainty for low-magnitude events).
 - Coherent spatial and temporal patterns observed across West Wall, East Wall, and International District of Axial Seamount.
+
+---
+
+## Real-time monitoring framework (§4.2)
+
+AxialPolCap is operational as part of the near-real-time focal mechanism estimation pipeline integrated into the Axial Seamount monitoring infrastructure. Results are publicly accessible through the **[Axial Seamount Earthquake Catalog portal](http://axial.ocean.washington.edu/)**, which provides hourly-updated earthquake detections, HYPOINVERSE locations, and focal mechanism solutions for the OOI Regional Cabled Array.
+
+**Pipeline overview** (Figure 14):
+
+1. Each hour, vertical-component waveforms are extracted for newly detected earthquakes using catalog P-wave arrival times.
+2. Waveforms are preprocessed identically to training data: demeaned, detrended, bandpass filtered 3–20 Hz, resampled to 100 Hz, max-normalized, and cropped to a 64-sample window centered on the P pick.
+3. **AxialPolCap** classifies each pick as Up or Down with an associated confidence and entropy.
+4. Predicted polarities are grouped via hierarchical clustering to form event families.
+5. **SKHASH** (Skoumal et al., 2024) computes confidence-weighted focal mechanisms.
+6. Solutions are published hourly to the portal.
+
+The pipeline has been running continuously since March 2026 and requires no manual intervention between updates, supporting robust focal mechanism determination even for small-magnitude events with limited polarity coverage.
 
 ---
 
@@ -119,7 +136,8 @@ Paper section                       Script
 §3.2  Evaluate unified model        01-scripts/evaluation/eval_model.py
 §3.2  Evaluate LOSO models          01-scripts/evaluation/eval_loso.py
 §3.2  Evaluate transfer learning    01-scripts/evaluation/eval_transfer_learning.py
-§4    Apply to 2015–2021 catalog    01-scripts/application/apply_to_catalog.py
+§4.1  Apply to 2015–2021 catalog    01-scripts/application/apply_to_catalog.py
+§4.2  Real-time pipeline (hourly)   integrated with http://axial.ocean.washington.edu/
 ---------------------------------------------------------------------------
 ```
 
@@ -248,12 +266,17 @@ Station order: AS1, AS2, CC1, EC1, EC2, EC3, ID1.
 
 The `02-data/` directory is **not** included in this repository.
 
-- Raw OOI waveform data: [Ocean Observatories Initiative](https://oceanobservatories.org)
-- Earthquake catalog: Wang et al. (2024), https://axialdd.ldeo.columbia.edu
-- Composite focal mechanism catalog: available upon request (mczhang8@uw.edu); to be archived on Zenodo following publication.
+- **Raw OOI waveform data** (real-time and archived): [OOI Cabled Array Seismometer Data](https://oceanobservatories.org/cabled-array-seismometer-data/)
+- **Earthquake catalog** (Wang et al., 2024, ML-based): https://axialdd.ldeo.columbia.edu
+- **Real-time focal mechanism catalog** (hourly updates): http://axial.ocean.washington.edu/
+- **Composite focal mechanism catalog** (1D and 3D solutions with associated polarity determinations): available upon request from the corresponding author (mczhang8@uw.edu); to be archived in a public repository (e.g., Zenodo) upon acceptance of the manuscript.
 
 ---
 
 ## Citation
 
-Citation to be added after publication.
+Manuscript in review. Citation will be added upon publication.
+
+Zhang, M., Wilcock, W. S. D., Denolle, M., Waldhauser, F., Wang, K., Tolstoy, M., & Tan, Y. J. (in review). *Adapting Deep Learning for P-Wave Polarity Classification in Marine OBS Environments: Application to Real-Time Focal Mechanism Monitoring at Axial Seamount.*
+
+Corresponding author: Maochuan Zhang ([mczhang8@uw.edu](mailto:mczhang8@uw.edu))
