@@ -1,282 +1,186 @@
 # AxialPolCap
 
-**Adapting Deep Learning for P-Wave Polarity Classification in Marine OBS Environments: Application to Real-Time Focal Mechanism Monitoring at Axial Seamount**
+**Adapting Deep-Learning P-Wave Polarity Classification to Ocean-Bottom Seismometers for Near-Real-Time Focal Mechanism Monitoring at Axial Seamount**
 
-Maochuan Zhang¹, William S. D. Wilcock¹, Marine Denolle¹, Felix Waldhauser², Kaiwen Wang⁴, Maya Tolstoy¹, Yen Joe Tan³
+Maochuan Zhang¹\*, Marine Denolle², William S. D. Wilcock¹, Felix Waldhauser³, Kaiwen Wang⁴, Maya Tolstoy¹, Yen Joe Tan⁵
 
-¹ School of Oceanography, University of Washington
-² Lamont-Doherty Earth Observatory, Columbia University
-³ Department of Earth and Environmental Sciences, The Chinese University of Hong Kong
-⁴ Institute of Geology and Geophysics, Chinese Academy of Sciences
+¹ School of Oceanography, University of Washington, Seattle, WA, USA
+² Department of Earth and Space Sciences, University of Washington, Seattle, WA, USA
+³ Lamont-Doherty Earth Observatory, Columbia University, Palisades, NY, USA
+⁴ Institute of Geology and Geophysics, Chinese Academy of Sciences, Beijing, China
+⁵ Department of Earth and Environmental Sciences, The Chinese University of Hong Kong, Hong Kong S.A.R., China
 
----
+\* Corresponding author: mczhang8@uw.edu
 
-## Abstract
-
-Determining P-wave first-motion polarity is essential for constraining focal mechanisms and understanding earthquake rupture processes. However, existing deep learning approaches are primarily trained on continental seismic networks and often perform poorly in marine environments where elevated noise levels, strong site effects, and variable couplings challenge model generalization. This study develops, to our knowledge, the first deep learning framework to advance polarity determination in oceanic settings, using data from the Ocean Observatories Initiative (OOI) Regional Cabled Array at Axial Seamount in the Pacific Ocean. We employ waveform cross-correlation-based and deep learning methods, training exclusively on a high-SNR, manually verified subset of Axial Seamount waveforms augmented with realistic noise extracted from the OOI catalog, and apply the trained models to the remaining catalog-scale data. Our newly developed model, **AxialPolCap**, incorporates data augmentation with waveform time-shift perturbations and demonstrates superior performance compared to existing approaches. On a held-out synthetic test set with realistic P-wave timing perturbations, AxialPolCap achieves approximately **96% polarity accuracy**, compared to 80–85% for existing deep-learning models and 92% for cross-correlation, both exceeding the ~90% inter-analyst consistency reported for manual picking (Hardebeck & Shearer, 2002). Leave-one-station-out cross-validation, in which the model is trained on six stations and tested on the seventh in turn, yields **96–98% accuracy** on unshifted waveforms across all held-out stations, confirming that the model generalizes without station-specific retraining. When applied to the independent 2015–2021 Axial Seamount catalog, AxialPolCap polarities agree with cross-correlation-derived polarities for **~88%** of picks and the resulting focal mechanisms match cross-correlation-based solutions with a **median Kagan angle of ~13°**, supporting the reliability of the approach for large-scale and real-time applications.
-
----
-
-## Study area and data
-
-Axial Seamount is an active submarine volcano ~500 km off the Oregon coast at the intersection of the Juan de Fuca Ridge and the Cobb-Eickelberg hotspot, with a horseshoe-shaped caldera ~8×3 km² at ~1.5 km depth. The OOI Regional Cabled Array operates 7 OBS stations at the seamount (AXAS1, AXAS2, AXCC1, AXEC1, AXEC2, AXEC3, AXID1) and has recorded >230,000 microearthquakes since late 2014.
-
-The earthquake catalog (Wang et al., 2024; 144,329 hypocenters) was produced using PhaseNet + GaMMA + SpecUFEx + NonLinLoc + HypoDD. This study uses events from 22 January 2015 through end of 2021 with ≥5 stations reporting P and S picks.
+Manuscript in preparation for *Seismological Research Letters*.
 
 ---
 
-## Methods
+## Overview
 
-### Synthetic waveform dataset (§2.3)
+AxialPolCap is a P-wave first-motion polarity classifier retrained from the PolarCAP
+architecture (Chakraborty et al., 2022) on ocean-bottom seismometer data from the OOI
+Regional Cabled Array at Axial Seamount. This repository holds the code that builds the
+training data, benchmarks four published classifiers against a cross-correlation (CC)
+method, trains and evaluates AxialPolCap, applies it to the 2015–2021 catalog, and
+generates the manuscript figures.
 
-- ~13,000 high-SNR (≥20 dB) template waveforms selected, demeaned, detrended, bandpass filtered 3–20 Hz, resampled to 100 Hz; 1-second window centered on P-wave pick; manually verified.
-- Polarity-reversed copies created, doubling to ~26,000. 20% (~5,200) reserved as independent test set.
-- Noise waveforms extracted from the 2016–2017 post-eruption quiet period.
-- Synthetic dataset: ~150,000 waveforms generated by merging templates with noise scaled to replicate the empirical SNR distribution.
+Headline results:
 
-### Benchmark (§3.1)
+| Quantity | Value |
+|---|---|
+| AxialPolCap, held-out test partition, no timing perturbation | ~98.5% |
+| AxialPolCap, σ = 0.01 s shift applied in training and testing | ~96% |
+| Four published DL models on the synthetic benchmark | 82–89% |
+| Cross-correlation on the synthetic benchmark | ~92% |
+| Leave-one-station-out, unshifted | 96.5–99.6% |
+| Agreement with CC, 2015–2021 catalog (templates excluded) | 82.3% of 230,565 picks |
+| Agreement for events with ≥5 confident polarities | 83.2% of 167,230 picks |
+| Median Kagan angle, CC vs AxialPolCap composite mechanisms | ~13° (3,145 clusters) |
 
-Four existing DL models benchmarked against the cross-correlation (CC) method:
+Seven stations are used throughout: AXAS1, AXAS2, AXCC1, AXEC1, AXEC2, AXEC3, AXID1
+(`AS1`, `AS2`, `CC1`, `EC1`, `EC2`, `EC3`, `ID1` in code).
 
-| Model | Input window | Notes |
-|-------|-------------|-------|
-| DiTingMotion (Zhao et al., 2023) | 1.28 s (128 samples, 100 Hz) | Requires sign-of-derivative second channel |
-| EQPolarity (Chen et al., 2024) | 6.0 s (100 Hz), 1–20 Hz bandpass | |
-| CFM (Messuti et al., 2023) | 1.60 s (160 samples, 100 Hz) | Adaptive clipping at 20× pre-arrival noise |
-| PolarCAP (Chakraborty et al., 2022) | 64 samples, max-normalized | Base architecture for AxialPolCap |
+---
 
-All existing DL models performed 10–20% below their reported continental accuracies; the CC method achieved ~92% average accuracy.
+## Model
 
-### AxialPolCap architecture (§3.2)
-
-A hybrid autoencoder + classifier with a shared encoder, adapted from PolarCAP:
+A hybrid autoencoder plus classifier with a shared encoder:
 
 ```
-Input: (64, 1)  -- 64-sample Z-component window at P-arrival (±0.32 s at 100 Hz)
+Input: (64, 1)   64-sample vertical-component window, P arrival ±0.32 s at 100 Hz
 
-Encoder
-  Conv1D(32 filters, kernel=32) -> Dropout(0.3) -> BatchNorm -> MaxPool(2)
-  Conv1D( 8 filters, kernel=16) ->                 BatchNorm -> MaxPool(2)
-  Output shape: (16, 8)
+Encoder    Conv1D(32, k=32) -> Dropout(0.3) -> BatchNorm -> MaxPool(2)
+           Conv1D( 8, k=16) ->                 BatchNorm -> MaxPool(2)
+           latent: (16, 8)
 
-Decoder branch (autoencoder)
-  Conv1D -> BatchNorm -> UpSample(2)
-  Conv1D -> BatchNorm -> UpSample(2)
-  Conv1D -> output shape (64, 1)
-  Loss: MSE, weight = 1
+Decoder    Conv1D -> BatchNorm -> UpSample -> Conv1D -> BatchNorm -> UpSample -> Conv1D
+           reconstruction: (64, 1),  MSE loss, weight 1
 
-Classifier branch (polarity)
-  Flatten -> Dense(2, softmax)
-  Loss: Huber (δ=0.5), weight = 200
-
-Outputs: [decoder, classifier]
-Polarity prediction: model.predict(X)[1]
+Classifier Flatten -> Dense(2, softmax)
+           polarity,  Huber loss (delta = 0.5), weight 200
 ```
 
-The 200× loss weight on the classifier forces the shared encoder to learn polarity-discriminative representations rather than pure waveform reconstruction.
+Training: Adam, learning rate 0.001, batch size 256, up to 40 epochs, early stopping on
+validation loss with a patience of 5. The augmented set is split 80/10/10 into training,
+validation and test partitions, stratified by polarity; the validation partition is used
+for early stopping and model selection.
 
-### Training strategies compared
-
-| Strategy | Accuracy | Notes |
-|----------|----------|-------|
-| All-station training | ~96–99% | Final choice for AxialPolCap |
-| LOSO cross-validation | Comparable (< 0.5% difference) | Confirms generalization to unseen stations |
-| Transfer learning (frozen PolarCAP) | ~2–6% worse | Particularly weaker at EC3, ID1 |
-
-**Key finding:** Training from scratch outperforms transfer learning. The SNR distribution of training data has minimal effect (~1–2%) for newly trained models; time-shift augmentation is the most critical factor.
-
-### Time-shift augmentation
-
-Training with P-wave pick time shifts (σ = 0.01–0.02 s via cubic-spline interpolation) substantially improves robustness when test data contain pick timing uncertainty. AxialPolCap is trained with σ = 0.02 s and achieves ~96% accuracy when tested with σ = 0.01 s shifts, compared to 80–85% for untrained DL baselines.
+> **Known limitation.** The 80/10/10 split is applied to augmented waveforms rather than
+> to parent templates, so different noisy realizations (and the sign-reversed copy) of a
+> template can fall in different partitions. Accuracies on this partition therefore
+> characterize robustness to noise and timing error rather than generalization to unseen
+> earthquakes. This is stated in the manuscript and a template-grouped split is planned.
 
 ---
 
-## Results: application to 2015–2021 catalog (§4.1)
+## Manuscript figures
 
-- Applied to all catalog waveforms not used in training/validation; preprocessing identical to training (demeaned, detrended, 3–20 Hz bandpass, max-normalized, 0.64 s window centered on P-pick).
-- Quality filter: confidence ≥ 0.8 AND entropy ≤ 0.2 → 200,578 accepted polarities (~66% of all P-wave picks).
-- Agreement with CC method: **~87.70%** across all stations and years.
-- Focal mechanism comparison: **median Kagan angle ~13°** between AxialPolCap-derived and CC-derived mechanisms (comparable to expected uncertainty for low-magnitude events).
-- Coherent spatial and temporal patterns observed across West Wall, East Wall, and International District of Axial Seamount.
+Final figures are in `03-figs/`. Numbering follows the manuscript; the
+`FigureNN_python.png` files use an earlier internal numbering and are kept for history.
 
----
+| Manuscript | File | Produced by |
+|---|---|---|
+| Figure 1 | `SRL_Figure01.png` | `Figure01_background.m`, `Figure01_panelCD_prep.m`, `figure_01_standalone.py` |
+| Figure 2 | `SRL_Figure02.png` | `make_manuscript_figures.py --figures 2` |
+| Figure 3 | `SRL_Figure03.png` | `make_manuscript_figures.py --figures 4` |
+| Figure 4 | `SRL_Figure04.png` | `make_manuscript_figures.py --figures 6` |
+| Figure 5 | `SRL_Figure05.png` | `make_manuscript_figures.py --figures 7` |
+| Figure 6 | `SRL_Figure06.png` | `make_manuscript_figures.py --figures 8` |
+| Figure 7 | `SRL_Figure07.png` | `make_manuscript_figures.py --figures 9` |
+| Figure 8 | `SRL_Figure08.png` | `Figure08_mechanism_comparison.m` |
+| Figure 9 | `SRL_Figure09.png` | schematic |
+| Figure S1 | `SRL_FigureS1.png` | `make_manuscript_figures.py` (confusion matrices) |
+| Figure S2 | `SRL_FigureS2.png` | `make_manuscript_figures.py --figures 5` |
+| Figure S3 | `SRL_FigureS3.png` | `make_manuscript_figures.py --figures 16` |
+| Figure S4 | `SRL_FigureS4.png` | `plot_figure11_2015_2021.py` |
+| Figure S5 | `SRL_FigureS5_snr.png` | `plot_figureS5_snr_map.py` |
+| Figure S6 | `SRL_FigureS5.png` | `Figure09_kagan_angle.py` / `FigureS5_kagan_2022_2026.m` |
+| Table S2 | `TableS1_benchmark_accuracy.md` | `make_manuscript_figures.py` |
 
-## Real-time monitoring framework (§4.2)
-
-AxialPolCap is operational as part of the near-real-time focal mechanism estimation pipeline integrated into the Axial Seamount monitoring infrastructure. Results are publicly accessible through the **[Axial Seamount Earthquake Catalog portal](http://axial.ocean.washington.edu/)**, which provides hourly-updated earthquake detections, HYPOINVERSE locations, and focal mechanism solutions for the OOI Regional Cabled Array.
-
-**Pipeline overview** (Figure 14):
-
-1. Each hour, vertical-component waveforms are extracted for newly detected earthquakes using catalog P-wave arrival times.
-2. Waveforms are preprocessed identically to training data: demeaned, detrended, bandpass filtered 3–20 Hz, resampled to 100 Hz, max-normalized, and cropped to a 64-sample window centered on the P pick.
-3. **AxialPolCap** classifies each pick as Up or Down with an associated confidence and entropy.
-4. Predicted polarities are grouped via hierarchical clustering to form event families.
-5. **SKHASH** (Skoumal et al., 2024) computes confidence-weighted focal mechanisms.
-6. Solutions are published hourly to the portal.
-
-The pipeline has been running continuously since March 2026 and requires no manual intervention between updates, supporting robust focal mechanism determination even for small-magnitude events with limited polarity coverage.
-
----
-
-## Workflow pipeline and script mapping
-
-Scripts live in `01-scripts/` organized by pipeline stage. Run in order from the `FM_ML/` root.
-
-```
-Paper section                       Script
----------------------------------------------------------------------------
-§2.3  Augment unified training set  01-scripts/data_preparation/01_build_training_dataset.py
-§2.3  Build paired eval set         01-scripts/data_preparation/02_build_eval_dataset.py
-§2.3  Augment LOSO training set     01-scripts/data_preparation/03_build_loso_training_dataset.py
-§2.3  Build LOSO eval set           01-scripts/data_preparation/04_build_loso_eval_dataset.py
-§3.1  Benchmark (PolarCAP etc.)     01-scripts/benchmark/eval_polarcap_baseline.py
-§3.2  Train AxialPolCap (unified)   01-scripts/training/train_axialpolcap.py
-§3.2  LOSO cross-validation         01-scripts/training/train_loso.py
-§3.2  Transfer learning             01-scripts/training/transfer_learning.py
-§3.2  Evaluate unified model        01-scripts/evaluation/eval_model.py
-§3.2  Evaluate LOSO models          01-scripts/evaluation/eval_loso.py
-§3.2  Evaluate transfer learning    01-scripts/evaluation/eval_transfer_learning.py
-§4.1  Apply to 2015–2021 catalog    01-scripts/application/apply_to_catalog.py
-§4.2  Real-time pipeline (hourly)   integrated with http://axial.ocean.washington.edu/
----------------------------------------------------------------------------
-```
-
-### Quickstart
+Two commands worth recording, because their defaults differ from the published figures:
 
 ```bash
-conda activate tf-2.14.0
+# Figure S4: spatial disagreement between AxialPolCap and CC
+python 01-scripts/plot_figure11_2015_2021.py \
+    --grid-m 200 --min-per-cell 150 --ratio-max 30 --exclude-templates \
+    --output 03-figs/SRL_FigureS4.png
 
-# 1. Data preparation
-python 01-scripts/data_preparation/01_build_training_dataset.py
-python 01-scripts/data_preparation/02_build_eval_dataset.py
-python 01-scripts/data_preparation/03_build_loso_training_dataset.py
-python 01-scripts/data_preparation/04_build_loso_eval_dataset.py
-
-# 2. Benchmark
-python 01-scripts/benchmark/eval_polarcap_baseline.py
-
-# 3. Training
-python 01-scripts/training/train_axialpolcap.py
-python 01-scripts/training/train_loso.py        # see note below
-python 01-scripts/training/transfer_learning.py
-
-# 4. Evaluation
-python 01-scripts/evaluation/eval_model.py
-python 01-scripts/evaluation/eval_loso.py
-python 01-scripts/evaluation/eval_transfer_learning.py
-
-# 5. Application
-python 01-scripts/application/apply_to_catalog.py
-```
-
-> **Note for `train_loso.py`:** The `stations` list is hardcoded to `['EC2','EC3','ID1']`. Change it to all 7 stations (`['AS1','AS2','CC1','EC1','EC2','EC3','ID1']`) before running a full LOSO sweep.
-
----
-
-## Directory structure
-
-```
-FM_ML/
-  01-scripts/                         # All active publication scripts
-    data_preparation/
-      01_build_training_dataset.py    # augment + crop + split unified dataset
-      02_build_eval_dataset.py        # build standalone eval set
-      03_build_loso_training_dataset.py
-      04_build_loso_eval_dataset.py
-      01_build_training_dataset_h5.py # H5 pipeline variant
-      02_build_eval_dataset_h5.py     # H5 pipeline variant
-      03_build_eval_dataset_h5_sigma001.py
-    benchmark/
-      eval_polarcap_baseline.py
-    training/
-      train_axialpolcap.py
-      train_loso.py
-      transfer_learning.py
-      train_axialpolcap_h5.py         # H5 pipeline variant
-    evaluation/
-      eval_model.py                   # evaluates H5-trained models
-      eval_loso.py
-      eval_transfer_learning.py
-    application/
-      apply_to_catalog.py
-    convert_mat_to_h5.py              # H5 pipeline: .mat → HDF5
-    split_h5_train_val.py             # H5 pipeline: split HDF5 dataset
-  02-data/                            # NOT tracked in git (see Data Availability)
-    K_aug/
-      Template_divide.mat             # templates for unified training
-      Template.mat                    # all templates (LOSO uses last 20%)
-      TMSF_Tra_001/                   # .npy output from script 01
-      STEP010/                        # .npy output from script 03
-      TMSF_Tra_002/                   # .h5 output (H5 pipeline)
-      TMSF_Val_002/                   # .h5 val output (H5 pipeline)
-    H_noi/
-      H_Noise_200.mat                 # 200-sample noise waveforms at 200 Hz
-      H_noise_dB20_snrValue.mat       # empirical per-station SNR distributions
-  03-figs/                            # output figures (confusion matrices, ROC curves)
-    LOSO_010/
-  04-logs/
-  05-tmp/                             # training history CSVs
-  06-models/                          # saved Keras models (.keras format)
-    LOSO_010/                         # one model per held-out station
-    history/                          # JSON training histories
+# Figure S5: spatial variation of P-wave SNR, on the same grid and cell minimum
+python 01-scripts/plot_figureS5_snr_map.py \
+    --grid-m 200 --min-per-cell 150 \
+    --output 03-figs/SRL_FigureS5_snr.png
 ```
 
 ---
 
-## Environment setup
+## Repository layout
 
-Python 3.11, TensorFlow 2.13.1, Keras 2.13.1:
+```
+01-scripts/
+  data_preparation/      build training and evaluation datasets (NPY and HDF5 variants)
+  benchmark/             evaluate the PolarCAP baseline
+  training/              train AxialPolCap; leave-one-station-out; transfer learning
+  evaluation/            evaluate LOSO and transfer-learning models
+  application/           apply the model to the 2015-2021 catalog
+  build_skhash_input_*.py, build_hash_input_*.py, compare_skhash_cc_ml.py
+                         focal-mechanism inputs and CC/ML mechanism comparison
+  plot_figure11_2015_2021.py, plot_figureS4_2022_2026.py,
+  plot_figureS5_snr_map.py, plot_disagreement_vs_snr.py
+                         supplementary figures
+  *.m                    MATLAB scripts for Figures 1, 8 and the Kagan histogram
+  make_manuscript_figures.py
+                         most manuscript figures; --figures N regenerates a subset
+03-figs/                 figure outputs
+06-models/               trained Keras models, LOSO models, training histories
+04-logs/                 run logs
+```
+
+Not tracked: `02-data/` and `07-files/` (input waveforms, catalogs, bathymetry and
+velocity models), the vendored third-party model repositories under `01-scripts/`, and
+the manuscript sources. See **Data availability**.
+
+---
+
+## Environment
 
 ```bash
-conda create -n tf-2.14.0 python=3.11
-conda activate tf-2.14.0
-pip install tensorflow==2.13.1 keras==2.13.1
-pip install scipy scikit-learn numpy matplotlib tqdm h5py
+conda activate tf_macos      # Python 3.11, TensorFlow 2.13.1, Keras 2.13.1
 ```
 
----
+Run every script from the repository root:
 
-## Data files required
+```bash
+python 01-scripts/<subdir>/<script>.py
+```
 
-| File | Contents |
-|------|----------|
-| `02-data/K_aug/Template_divide.mat` | Template events (training split). Struct arrays `{STA}_T`; each event has `W_{STA}` (200 samples, 200 Hz) and `Man_{STA}` or `Po_{STA}` (polarity: −1 or +1). |
-| `02-data/K_aug/Template.mat` | All template events (`AS1`…`ID1` struct arrays). LOSO uses the last 20% of each station. |
-| `02-data/H_noi/H_Noise_200.mat` | Struct array `Felix` of noise events; each entry has `W_{STA}` fields (200 samples). |
-| `02-data/H_noi/H_noise_dB20_snrValue.mat` | Cell array `snrValues`; element i = empirical SNR values (dB) for station i. Used to fit the lognormal augmentation distribution. |
+Notes:
 
-Station order: AS1, AS2, CC1, EC1, EC2, EC3, ID1.
-
----
-
-## Data conventions
-
-- **Normalization**: each 64-sample waveform is max-normalized independently: `X / max(|X|)`. Apply before training and inference.
-- **Polarity labels**: stored as int32, values 0 (negative) and 1 (positive). MATLAB convention (−1 / +1) is converted during data preparation.
-- **NPY file naming**:
-  - `{split}_timeseries_{STA}.npy` — shape `(N, 64, 1)`, float32
-  - `{split}_polarities_{STA}.npy` — shape `(N,)`, int32
-  - `{split}_timeseries_all.npy` / `{split}_polarities_all.npy` — merged across all stations
-  - `{split}` is `train`, `val`, or `test` (80 / 10 / 10 split)
-- **Output `.mat` files** (from `apply_to_catalog.py`): field `Po_{STA}` is overwritten with a 4-element array `[GroundTruth, Prediction, Confidence, Entropy]`.
+- The TensorFlow Metal plugin crashes during `model.predict` and fine-tuning on macOS.
+  Inference and fine-tuning scripts call `tf.config.set_visible_devices([], 'GPU')`; keep
+  that pattern in any new script.
+- Models whose outputs are wrapped in named `Lambda` layers (from `train_loso.py`) must be
+  loaded with `keras.models.load_model(path, safe_mode=False)`.
+- `make_manuscript_figures.py` needs `cartopy` for the map panel.
 
 ---
 
 ## Data availability
 
-The `02-data/` directory is **not** included in this repository.
-
-- **Raw OOI waveform data** (real-time and archived): [OOI Cabled Array Seismometer Data](https://oceanobservatories.org/cabled-array-seismometer-data/)
-- **Earthquake catalog** (Wang et al., 2024, ML-based): https://axialdd.ldeo.columbia.edu
-- **Real-time focal mechanism catalog** (hourly updates): http://axial.ocean.washington.edu/
-- **Composite focal mechanism catalog** (1D and 3D solutions with associated polarity determinations): available upon request from the corresponding author (mczhang8@uw.edu); to be archived in a public repository (e.g., Zenodo) upon acceptance of the manuscript.
+Seismic data are from the EarthScope Consortium Data Management Center, network code
+`OO`. The earthquake catalog of Wang et al. (2024) is at
+<https://axialdd.ldeo.columbia.edu>. The composite focal-mechanism catalog and polarity
+determinations produced here are at
+<http://axial.ocean.washington.edu/FocalMechanisms.html>. Input data are not stored in
+this repository because of their size.
 
 ---
 
-## Citation
+## References
 
-Manuscript in preparation. Citation will be added upon publication.
-
-Zhang, M., Wilcock, W. S. D., Denolle, M., Waldhauser, F., Wang, K., Tolstoy, M., & Tan, Y. J. (in prep.). *Adapting Deep Learning for P-Wave Polarity Classification in Marine OBS Environments: Application to Real-Time Focal Mechanism Monitoring at Axial Seamount.*
-
-Corresponding author: Maochuan Zhang ([mczhang8@uw.edu](mailto:mczhang8@uw.edu))
+- Chakraborty, M., et al. (2022). PolarCAP: a deep learning approach for first motion polarity classification of earthquake waveforms. *Artificial Intelligence in Geosciences*, 3, 46–52. doi:10.1016/j.aiig.2022.08.001
+- Chen, Y., et al. (2024). Deep learning for P-wave first-motion polarity determination and its application in focal mechanism inversion. *IEEE TGRS*, 62, 1–11. doi:10.1109/TGRS.2024.3407060
+- Messuti, G., et al. (2023). CFM: a convolutional neural network for first-motion polarity classification of seismic records in volcanic and tectonic areas. *Frontiers in Earth Science*, 11, 1223686. doi:10.3389/feart.2023.1223686
+- Skoumal, R. J., Hardebeck, J. L., and Shearer, P. M. (2024). SKHASH: a Python package for computing earthquake focal mechanisms. *SRL*, 95(4), 2519–2526. doi:10.1785/0220230329
+- Wang, K., et al. (2024). Real-time detection of volcanic unrest and eruption at Axial Seamount using machine learning. *SRL*, 95(5), 2651–2662. doi:10.1785/0220240086
+- Zhao, M., et al. (2023). DiTingMotion: a deep-learning first-motion-polarity classifier and its application to focal mechanism inversion. *Frontiers in Earth Science*, 11, 1103914. doi:10.3389/feart.2023.1103914

@@ -15,3 +15,24 @@ __pycache__/
 
 # Temporary files
 05-tmp/
+
+# Large external datasets and vendored third-party model repos (not tracked)
+07-files/
+01-scripts/FM_ML_bk/
+01-scripts/FM_ML_CFM/
+01-scripts/FM_ML_EQP/
+01-scripts/FM_MLV2/
+
+# Manuscript sources and backups (kept out of the code repo)
+04-manuscripts/
+
+# Intermediate / superseded figure outputs
+03-figs/backup_pre_merge/
+/Figure03_replace_python.png
+/Figure03_updates.png
+/FigureS2.png
+/FigureS2_confusion_matrices.png
+
+# Editor and agent scratch
+*.bak
+.claude/

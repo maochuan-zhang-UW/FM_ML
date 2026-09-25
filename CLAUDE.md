@@ -18,11 +18,11 @@ pipeline stage.
 
 ## Environment Setup
 
-The conda environment is `tf-2.14.0` (Python 3.11, TensorFlow 2.13.1,
+The conda environment is `tf_macos` (Python 3.11, TensorFlow 2.13.1,
 Keras 2.13.1):
 
 ```bash
-conda activate tf-2.14.0
+conda activate tf_macos
 ```
 
 All scripts are run as standalone Python scripts from the repository root

@@ -33,7 +33,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import ListedColormap
 from matplotlib.patches import Circle, Ellipse, FancyBboxPatch, Polygon
-from matplotlib.ticker import ScalarFormatter
+from matplotlib.ticker import FormatStrFormatter, ScalarFormatter
 from scipy.io import loadmat, netcdf_file
 from scipy.signal import resample
 from scipy.stats import lognorm
@@ -41,6 +41,108 @@ from scipy.stats import lognorm
 
 STATIONS = ["AS1", "AS2", "CC1", "EC1", "EC2", "EC3", "ID1"]
 STATIONS_AVG = STATIONS + ["Average"]
+STATIONS_AX = ["AXAS1", "AXAS2", "AXCC1", "AXEC1", "AXEC2", "AXEC3", "AXID1"]
+STATIONS_AX_AVG = STATIONS_AX + ["Average"]
+
+# ---------------------------------------------------------------------------
+# Manuscript figure style (revision 1, in response to review comments 19/25/32/47)
+#
+# Two rules drive the choices below.
+#
+# 1. Figures are drawn at their final printed width (FIG_WIDTH_IN) so Word does
+#    not have to scale them down.  Previously several panels were 10-19 inches
+#    wide and were shrunk to ~6.5 in on the page, which reduced 10 pt labels to
+#    3-6 pt.  Drawing at print size keeps the point sizes below honest.
+# 2. A single semantic palette is shared across Figures 4/6/7/8/9.  The three
+#    reference models introduced in Figure 6 keep their Figure 6 colour wherever
+#    they reappear as a baseline; every *new* category introduced in a later
+#    figure gets a colour that is not used in Figure 6.
+# ---------------------------------------------------------------------------
+
+FIG_WIDTH_IN = 7.0          # SRL single-page text width
+FIG_WIDTH_WIDE_IN = 7.2     # for 4-column panel grids
+
+# ---------------------------------------------------------------------------
+# Original manuscript palette (restored at the author's request).
+#
+# Figures 6, 7, 8 and 9 each use the same three pastels in positional order,
+# exactly as in the original scripts.  Figure 4 adds two more for its five
+# benchmark methods.
+# ---------------------------------------------------------------------------
+
+C_SCRATCH = (0.95, 0.80, 0.45)    # amber
+C_LOSO = (0.95, 0.60, 0.60)       # coral pink
+C_TRANSFER = (0.60, 0.90, 0.90)   # turquoise
+C_VAR_1 = (0.60, 0.80, 0.60)      # green   (Figure 4 only)
+C_VAR_2 = (0.75, 0.65, 0.95)      # purple  (Figure 4 only)
+
+# Figures 5 and 6 each compare two variant conditions against a Figure 4
+# baseline.  The baseline bar keeps its Figure 4 hue; the two variants share
+# this grey ramp in both figures, so hue always means "which model of Figure 4"
+# and never "which variant".  Both variables are ordered -- SNR band in
+# Figure 5, time shift in Figure 6 -- so the ramp darkens along that order and
+# the figures stay readable in greyscale.
+C_ALT_1 = (0.72, 0.72, 0.75)      # milder variant  (high SNR / sigma = 0.01 s)
+C_ALT_2 = (0.45, 0.45, 0.50)      # harsher variant (low SNR / sigma = 0.02 s)
+
+SERIES3 = [C_SCRATCH, C_LOSO, C_TRANSFER]
+
+C_MODEL_ALL, C_MODEL_LOSO, C_MODEL_TL = C_SCRATCH, C_LOSO, C_TRANSFER
+C_CAT_A, C_CAT_B, C_CAT_C = C_SCRATCH, C_LOSO, C_TRANSFER
+C_VAR_3 = C_VAR_1
+C_REFERENCE = C_VAR_2
+
+C_BENCH = [C_SCRATCH, C_LOSO, C_TRANSFER, C_VAR_1, C_VAR_2]
+
+A_PICK = "red"
+A_NOTE = "blue"
+A_INK = "k"
+
+SEQ_CMAP = "jet"
+
+TINT_NEUTRAL = "#f6f6f6"
+TINT_CONV = "#e8f4ff"
+TINT_POOL = "#e8ffe8"
+TINT_REG = "#fff7e8"
+TINT_LATENT = "#f0ecff"
+TINT_CLASS = "#ffeef2"
+
+
+def apply_manuscript_style() -> None:
+    """Set global matplotlib style for every manuscript figure.
+
+    Arial replaces Times New Roman throughout (review comment 19: axis labels
+    should be sans-serif and legible at printed size).
+    """
+    import matplotlib
+
+    matplotlib.rcParams.update({
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
+        "font.size": 9,
+        "axes.labelsize": 10,
+        "axes.titlesize": 10,
+        "axes.linewidth": 0.8,
+        "xtick.labelsize": 9,
+        "ytick.labelsize": 9,
+        "legend.fontsize": 9,
+        "legend.frameon": True,
+        "legend.framealpha": 0.9,
+        "legend.borderpad": 0.4,
+        "figure.titlesize": 11,
+        "lines.linewidth": 1.0,
+        "patch.linewidth": 0.6,
+        "savefig.dpi": 400,
+        "mathtext.fontset": "dejavusans",
+    })
+
+
+def panel_label(ax: plt.Axes, text: str, dx: float = 0.0, dy: float = 1.012) -> None:
+    """Consistent (a)/(b) panel labels, placed above the axes so they cannot
+    collide with an in-axes legend."""
+    ax.text(dx, dy, text, transform=ax.transAxes, fontsize=9.5, fontweight="bold",
+            va="bottom", ha="left")
+
 
 # From FM4/01-scripts/Before22OBSs/x_plot_2F_ineachstation.m
 STATION_COORDS = {
@@ -749,6 +851,189 @@ def figure_02(paths: Paths, outdir: Path) -> Path:
     return out
 
 
+def figure_02_merged(paths: Paths, outdir: Path) -> Path:
+    """Merged replacement for Figures 2 and 3, restricted to one station (AXAS2).
+
+    (a) high-SNR template waveforms, five of each manual polarity
+    (b) ambient-noise waveforms
+    (c) the same template augmented with noise across a range of SNRs
+
+    The original figure_02 / figure_03 builders are left in place; this writes
+    to a separate file so the two-figure version stays available as a backup.
+    """
+    sta = "AS2"
+    n_trace = 10
+    offset = 2.0
+    wave_field = f"W_{sta}"
+    po_field = f"Po_{sta}"
+
+    template = load_struct_array(paths.repo_root / "02-data" / "A_wave_dB20_cleaned.mat", "Felix")
+    noise = load_struct_array(paths.repo_root / "02-data" / "A_wave_noise_10000.mat", "Felix")
+
+    def valid_wave(e):
+        w = as_1d(get_value(e, wave_field, np.array([])))
+        return w if w.size >= 200 else None
+
+    def first_motion(w):
+        """Sign and strength of the first half-cycle after the P arrival.
+
+        Panel (a) plots the arrival at sample 100.  Strength is the peak of that
+        first half-cycle divided by the pre-arrival RMS, so it says how far the
+        first swing rises above the background.
+        """
+        pre = np.sqrt(np.mean(w[:90] ** 2)) + 1e-15
+        seg = w[100:130]
+        sign = int(np.sign(seg[0]))
+        k = 1
+        while k < seg.size and np.sign(seg[k]) == sign:
+            k += 1
+        return sign, float(np.max(np.abs(seg[:k])) / pre)
+
+    # Five templates of each polarity, interleaved, so the panel shows both
+    # cases.  A template is only used if its first motion actually reads as the
+    # polarity it is labelled with: the first swing must share the sign of Po
+    # and rise well clear of the pre-arrival noise.  Taking the first five of
+    # each polarity without this test picked up emergent onsets and traces whose
+    # first swing opposes the label, which is the opposite of what the panel is
+    # meant to show.
+    min_clarity = 40.0
+    pos, neg = [], []
+    for e in template:
+        w = valid_wave(e)
+        if w is None:
+            continue
+        po = get_value(e, po_field, None)
+        if po is None:
+            continue
+        po = int(np.sign(float(po)))
+        if po == 0:
+            continue
+        sign, clarity = first_motion(w[:200])
+        if sign != po or clarity < min_clarity:
+            continue
+        bucket = pos if po > 0 else neg
+        if len(bucket) < n_trace // 2:
+            bucket.append((w, po))
+        if len(pos) >= n_trace // 2 and len(neg) >= n_trace // 2:
+            break
+    picked = [x for pair in zip(neg, pos) for x in pair]
+
+    fig, axes = plt.subplots(1, 3, figsize=(FIG_WIDTH_IN, 5.6), constrained_layout=True)
+
+    # ---- (a) templates ---------------------------------------------------
+    ax = axes[0]
+    for i, (w, po) in enumerate(picked):
+        wn = norm_wave(w[::2])
+        t = np.linspace(-0.5, 0.49, wn.size)
+        yoff = i * offset
+        ax.plot(t, wn + yoff, "b-", linewidth=1.0)
+        ax.text(-0.46, yoff + 0.55, f"Po: {po:+d}", fontsize=7, color="k")
+    ax.set_ylabel("Normalized amplitude")
+
+    # ---- (b) noise -------------------------------------------------------
+    # The same noise entries feed panel (c), so collect them once using the
+    # validity test _plot_stacked_waves applies, and hand that list to both.
+    noise_used = []
+    for e in noise:
+        w = get_value(e, wave_field, None)
+        if not isinstance(w, np.ndarray) or w.size <= 1:
+            continue
+        noise_used.append(e)
+        if len(noise_used) >= n_trace:
+            break
+
+    _plot_stacked_waves(axes[1], noise_used, sta, n_plot=n_trace, offset=offset,
+                        use_po_label=False, half_rate=False)
+    axes[1].set_title("")
+    axes[1].set_box_aspect(None)
+
+    # ---- (c) one template from (a) + the noise of (b), across a range of SNR
+    # Panel (c) is built from the topmost template of (a) and the noise traces
+    # of (b): row i of (c) is that template plus row i of (b), scaled to a
+    # different target SNR.  Using one real template throughout means every
+    # synthetic trace carries the same first motion as its parent in (a), which
+    # is what makes the augmented waveforms usable as labelled training data.
+    base_wave, base_po = picked[-1]       # the topmost template drawn in (a)
+    signal = base_wave[:200]
+
+    # Target SNRs come from the lognormal fitted to this station's empirical SNR
+    # values -- the same distribution the training set is augmented from -- so
+    # (c) shows the noise levels the model is actually trained on rather than an
+    # arbitrary ladder.  Evenly spaced quantiles of that fit are used instead of
+    # random draws: the spread is representative and no two traces land on top
+    # of each other.
+    snr_file = choose_existing(
+        paths.repo_root / "02-data" / "H_Noi" / "H_noise_dB20_snrValue.mat",
+        paths.repo_root / "02-data" / "H_noi" / "H_noise_dB20_snrValue.mat",
+    )
+    if snr_file is not None:
+        snr_values = load_scalar_or_array(snr_file, "snrValues")
+        snr_data = np.asarray(snr_values[STATIONS.index(sta)], dtype=float).ravel()
+    else:                                  # fall back to the templates themselves
+        snr_data = np.array([
+            20 * np.log10((np.sqrt(np.mean(w[80:160] ** 2)) + 1e-12)
+                          / (np.sqrt(np.mean(w[:80] ** 2)) + 1e-12))
+            for w, _ in picked])
+    snr_data = snr_data[np.isfinite(snr_data) & (snr_data > 0)]
+    shape, loc, scale = lognorm.fit(snr_data, floc=0)
+    targets = lognorm.ppf(np.linspace(0.05, 0.95, n_trace - 1), shape, loc, scale)
+
+    traces, trace_db = [], []
+    for i, target_db in enumerate(targets):
+        w = as_1d(get_value(noise_used[i], wave_field, np.array([])))
+        w = np.pad(w, (0, 200 - w.size)) if w.size < 200 else w[:200]
+        rms_target = np.sqrt(np.mean(signal ** 2)) / (10 ** (target_db / 20))
+        traces.append(signal + (rms_target / (np.sqrt(np.mean(w ** 2)) + 1e-12)) * w)
+        trace_db.append(target_db)
+    traces.append(signal.copy())          # unaugmented template on top
+    # The template carries no target, so label it with its own measured SNR.
+    trace_db.append(20 * np.log10((np.sqrt(np.mean(signal[80:160] ** 2)) + 1e-12)
+                                  / (np.sqrt(np.mean(signal[:80] ** 2)) + 1e-12)))
+
+    ax = axes[2]
+    ticks, labels = [], []
+    for i, w in enumerate(traces):
+        # Label the SNR the trace was built to, not a value re-measured over a
+        # window that straddles the arrival: the latter is not monotonic in the
+        # target and collides at the low end.
+        snr_db = trace_db[i]
+        is_base = i == len(traces) - 1
+        wn = norm_wave(w[::2])
+        t = np.linspace(-0.5, 0.49, wn.size)
+        yoff = i * offset
+        ax.plot(t, wn + yoff, color="red" if is_base else "black",
+                linewidth=1.4 if is_base else 0.9)
+        # Every synthetic trace inherits the polarity of its parent template
+        # in (a); label it the same way (a) does so that stays visible.
+        ax.text(-0.46, yoff + 0.55, f"Po: {base_po:+d}", fontsize=7, color="k")
+        ticks.append(yoff)
+        labels.append(f"{snr_db:.1f} dB")
+    ax.yaxis.tick_right()
+    ax.set_yticks(ticks)
+    ax.set_yticklabels(labels, fontsize=7)
+    ax.tick_params(axis="y", length=0)
+    for lab, is_base in zip(ax.get_yticklabels(), [False] * (len(traces) - 1) + [True]):
+        lab.set_color(A_PICK if is_base else A_NOTE)
+
+    for ax in axes:
+        ax.set_xlim([-0.5, 0.5])
+        # The extra 1.2 leaves a clear strip above the top trace for the
+        # in-axes panel label.
+        ax.set_ylim([-offset, n_trace * offset + 1.2])
+        ax.set_xlabel("Time (s)")
+        ax.grid(alpha=0.2)
+    for ax in axes[:2]:
+        ax.set_yticks([])
+
+    # Panel labels sit inside the top-left corner of each axes.
+    for ax, lab in zip(axes, ("(a)", "(b)", "(c)")):
+        panel_label(ax, lab, dx=0.025, dy=0.955)
+
+    out = outdir / "Figure02_merged_python.png"
+    save_figure(fig, out)
+    return out
+
+
 def figure_03(paths: Paths, outdir: Path) -> Path:
     # Template waveforms: prefer station-specific file, fall back to cleaned catalog
     as1_path = choose_existing(
@@ -798,13 +1083,13 @@ def figure_03(paths: Paths, outdir: Path) -> Path:
     signal = as_1d(get_value(base, "W_AS1", np.array([])))
     signal = signal[:200]
 
-    traces: List[np.ndarray] = [signal.copy()]
+    traces: List[np.ndarray] = []
     snr_labels: List[float] = []
     for k in range(11):
         if k == 0:
             syn = signal.copy()
         else:
-            target_db = float(rng.uniform(2, 45))
+            target_db = float(rng.uniform(5, 45))
             valid = False
             while not valid:
                 n = noise[rng.integers(0, len(noise))]
@@ -825,20 +1110,20 @@ def figure_03(paths: Paths, outdir: Path) -> Path:
         snr_labels.append(float(snr_db))
         traces.append(syn)
 
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, 5.2), constrained_layout=True)
     for i, w in enumerate(traces[:11]):
         w = norm_wave(w)
         yoff = i * 2.0
         color = "red" if i == 0 else "black"
         ax.plot(np.arange(w.size), w + yoff, color=color, linewidth=1.6 if i == 0 else 1.0)
-        txt_color = "red" if i == 0 else "blue"
+        txt_color = A_PICK if i == 0 else A_NOTE
         ax.text(205, yoff, f"{snr_labels[i]:.1f} dB", fontsize=9, color=txt_color, va="center")
     ax.set_xlim([0, 240])
     ax.set_ylim([-1, 22])
     ax.set_yticks([])
     ax.set_xlabel("Sample index")
     ax.set_ylabel("Normalized waveform (stacked)")
-    ax.set_title("Figure 3: AS1 augmentation examples with target SNR")
+    ax.set_title("")
     ax.grid(alpha=0.15)
     out = outdir / "Figure03_python.png"
     save_figure(fig, out)
@@ -850,46 +1135,130 @@ def _grouped_bar(ax: plt.Axes, data: np.ndarray, labels: Sequence[str], series: 
     x = np.arange(n_groups)
     width = 0.82 / n_series
     for i in range(n_series):
-        ax.bar(x - 0.41 + width / 2 + i * width, data[:, i], width=width, color=colors[i], label=series[i], edgecolor="k")
+        ax.bar(
+            x - 0.41 + width / 2 + i * width,
+            data[:, i],
+            width=width,
+            color=colors[i],
+            label=series[i],
+            edgecolor="k",
+            linewidth=0.5,
+        )
     ax.set_xticks(x)
     ax.set_xticklabels(labels, rotation=0)
     ax.set_ylim(ylim)
-    ax.grid(axis="y", alpha=0.25)
+    ax.grid(axis="y", alpha=0.25, linewidth=0.5)
+    ax.set_axisbelow(True)
+    # Separate the "Average" group from the per-station groups.
+    if labels and str(labels[-1]).lower().startswith("average"):
+        ax.axvline(n_groups - 1.5, color="0.55", linestyle=":", linewidth=0.9, zorder=0)
+
+
+# ---------------------------------------------------------------------------
+# Benchmark confusion matrices (rows = actual Up/Down, cols = predicted
+# Up/Down).  These are the counts behind both the Average bar of Figure 3 and
+# the supplementary confusion-matrix figure, so the two cannot drift apart.
+# DiTingMotion is evaluated on fewer waveforms than the other three because it
+# returns no prediction for part of the set.
+# ---------------------------------------------------------------------------
+CM_COUNTS = {
+    "DiTingMotion": [[5685, 723], [742, 1179]],
+    "CFM": [[8609, 1032], [939, 6548]],
+    "EQPolarity": [[8648, 993], [1091, 6396]],
+    "PolarCAP": [[8633, 1008], [1066, 6421]],
+}
+
+
+def figure_s_confusion(paths: Paths, outdir: Path) -> Path:
+    """Supplementary confusion matrices for the four benchmarked DL models.
+
+    Styled to match the other manuscript figures: same text width, same 300 dpi
+    export, same panel-label convention.
+    """
+    from matplotlib import cm as _cm
+    from matplotlib.colors import Normalize
+
+    order = ["DiTingMotion", "CFM", "EQPolarity", "PolarCAP"]
+    fig, axes = plt.subplots(2, 2, figsize=(FIG_WIDTH_IN, 6.1), constrained_layout=True)
+    norm = Normalize(vmin=0, vmax=100)
+    cmap = _cm.get_cmap("Blues")
+
+    for ax, name, lab in zip(axes.ravel(), order, "abcd"):
+        counts = np.array(CM_COUNTS[name], dtype=float)
+        row_pct = 100.0 * counts / counts.sum(axis=1, keepdims=True)
+        n = int(counts.sum())
+        acc = 100.0 * (counts[0, 0] + counts[1, 1]) / n
+
+        ax.imshow(row_pct, cmap=cmap, norm=norm, aspect="equal")
+        for i in range(2):
+            for j in range(2):
+                ax.text(j, i, f"{int(counts[i, j])}\n({row_pct[i, j]:.1f}%)",
+                        ha="center", va="center", fontsize=8.5,
+                        color="white" if row_pct[i, j] > 55 else "k")
+        ax.set_xticks([0, 1]); ax.set_xticklabels(["Pred. Up", "Pred. Down"], fontsize=8)
+        ax.set_yticks([0, 1]); ax.set_yticklabels(["Actual Up", "Actual Down"], fontsize=8)
+        ax.tick_params(length=0)
+        for sp in ax.spines.values():
+            sp.set_linewidth(0.8)
+        ax.set_title(f"({lab}) {name}\nn = {n:,}, accuracy = {acc:.1f}%", fontsize=9)
+
+    cb = fig.colorbar(_cm.ScalarMappable(norm=norm, cmap=cmap), ax=axes,
+                      fraction=0.040, pad=0.02)
+    cb.set_label("Row-normalized (%)", fontsize=8.5)
+    cb.ax.tick_params(labelsize=8)
+
+    out = outdir / "FigureS_confusion_python.png"
+    save_figure(fig, out)
+    return out
 
 
 def figure_04(paths: Paths, outdir: Path) -> Path:
-    colors = [(0.95, 0.80, 0.45), (0.95, 0.60, 0.60), (0.60, 0.90, 0.90), (0.60, 0.80, 0.60), (0.75, 0.65, 0.95)]
-    diting = np.array([97.03, 78.23, 97.86, 89.10, 88.04, 77.03, 73.23])
-    cfm = np.array([97.03, 80.98, 97.35, 88.27, 87.12, 82.91, 74.46])
-    eqp = np.array([92.85, 76.57, 90.85, 85.16, 83.09, 80.64, 72.49])
-    polcap = np.array([0.7942, 0.7270, 0.8186, 0.7699, 0.8307, 0.7617, 0.6857]) * 100
+    colors = C_BENCH
+    # DiTingMotion, EQPolarity and PolarCAP re-run 2026-09-18; CFM and the
+    # cross-correlation baseline are unchanged and keep their original values.
+    diting = np.array([94.1, 70.9, 85.8, 76.2, 81.6, 66.2, 84.8])
+    cfm = np.array([97.0, 81.0, 97.4, 88.3, 87.1, 82.9, 74.5])
+    eqp = np.array([96.5, 79.4, 96.8, 87.1, 86.0, 83.3, 75.4])
+    polcap = np.array([96.1, 79.8, 97.3, 87.8, 86.4, 81.9, 75.4])
     cc = np.array([0.99972, 0.95991, 0.99134, 0.93391, 0.84833, 0.87012, 0.80463]) * 100
+    # The Average bar is the pooled accuracy over all waveforms, not the
+    # unweighted mean of the seven station accuracies: it is the value the
+    # confusion matrices of Figure S1 report, and it weights each station by how
+    # many waveforms it contributes.  Taken from CM_COUNTS below so the bar and
+    # the confusion matrix can never disagree.
+    pooled = {k: 100.0 * (v[0][0] + v[1][1]) / sum(v[0] + v[1])
+              for k, v in CM_COUNTS.items()}
     data = np.vstack(
         [
-            np.r_[diting, diting.mean()],
-            np.r_[cfm, cfm.mean()],
-            np.r_[eqp, eqp.mean()],
-            np.r_[polcap, polcap.mean()],
-            np.r_[cc, cc.mean()],
+            np.r_[diting, pooled["DiTingMotion"]],
+            np.r_[cfm, pooled["CFM"]],
+            np.r_[eqp, pooled["EQPolarity"]],
+            np.r_[polcap, pooled["PolarCAP"]],
+            np.r_[cc, cc.mean()],   # no confusion matrix for CC; station mean
         ]
     ).T
 
-    fig, ax = plt.subplots(figsize=(11, 6))
-    _grouped_bar(ax, data, STATIONS_AVG, ["DiTingMotion", "CFM", "EQPolarity", "AxialPolCap", "CC"], colors, (60, 100))
+    fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, 3.6), constrained_layout=True)
+    _grouped_bar(
+        ax, data, STATIONS_AX_AVG,
+        ["DiTingMotion", "CFM", "EQPolarity", "PolarCAP", "Cross-correlation"],
+        colors, (60, 104),
+    )
     ax.set_ylabel("Accuracy (%)")
     ax.set_xlabel("Station")
-    ax.set_title("Figure 4: Benchmark accuracy by station")
-    ax.legend(ncol=3, fontsize=9)
+    ax.set_title("")
+    ax.legend(ncol=5, loc="upper center", columnspacing=1.0, handlelength=1.3,
+              handletextpad=0.4, borderaxespad=0.2, fontsize=7.5)
     out = outdir / "Figure04_python.png"
     save_figure(fig, out)
     return out
 
 
 def figure_05(paths: Paths, outdir: Path) -> Path:
-    fig, ax = plt.subplots(figsize=(12, 6))
+    fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, 3.5), constrained_layout=True)
     ax.axis("off")
 
-    def box(x, y, w, h, text, fc="#f6f6f6", ec="black", fs=10):
+    def box(x, y, w, h, text, fc=TINT_NEUTRAL, ec="black", fs=10):
         p = FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.02,rounding_size=0.02", facecolor=fc, edgecolor=ec, linewidth=1.2)
         ax.add_patch(p)
         ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=fs)
@@ -899,22 +1268,22 @@ def figure_05(paths: Paths, outdir: Path) -> Path:
 
     # Encoder
     box(0.03, 0.44, 0.12, 0.12, "Input\n1 x 200")
-    box(0.20, 0.44, 0.12, 0.12, "Conv1D\n32, k=32", fc="#e8f4ff")
-    box(0.36, 0.44, 0.10, 0.12, "MaxPool", fc="#e8ffe8")
-    box(0.50, 0.44, 0.12, 0.12, "Conv1D\n8, k=16", fc="#e8f4ff")
-    box(0.66, 0.44, 0.10, 0.12, "Dropout\n0.3", fc="#fff7e8")
-    ell = Ellipse((0.84, 0.50), 0.13, 0.14, facecolor="#f0ecff", edgecolor="black")
+    box(0.20, 0.44, 0.12, 0.12, "Conv1D\n32, k=32", fc=TINT_CONV)
+    box(0.36, 0.44, 0.10, 0.12, "MaxPool", fc=TINT_POOL)
+    box(0.50, 0.44, 0.12, 0.12, "Conv1D\n8, k=16", fc=TINT_CONV)
+    box(0.66, 0.44, 0.10, 0.12, "Dropout\n0.3", fc=TINT_REG)
+    ell = Ellipse((0.84, 0.50), 0.13, 0.14, facecolor=TINT_LATENT, edgecolor="black")
     ax.add_patch(ell)
     ax.text(0.84, 0.50, "Latent\ncode", ha="center", va="center", fontsize=10)
 
     # Decoder
-    box(0.50, 0.16, 0.12, 0.12, "Conv1D\n8, k=16", fc="#e8f4ff")
-    box(0.34, 0.16, 0.12, 0.12, "Upsample", fc="#e8ffe8")
-    box(0.18, 0.16, 0.12, 0.12, "Conv1D\n32, k=32", fc="#e8f4ff")
+    box(0.50, 0.16, 0.12, 0.12, "Conv1D\n8, k=16", fc=TINT_CONV)
+    box(0.34, 0.16, 0.12, 0.12, "Upsample", fc=TINT_POOL)
+    box(0.18, 0.16, 0.12, 0.12, "Conv1D\n32, k=32", fc=TINT_CONV)
     box(0.03, 0.16, 0.12, 0.12, "Output\n1 x 200")
 
     # Classifier head
-    box(0.80, 0.76, 0.17, 0.10, "Softmax classifier\nP(Up), P(Down)", fc="#ffeef2")
+    box(0.80, 0.76, 0.17, 0.10, "Softmax classifier\nP(Up), P(Down)", fc=TINT_CLASS)
 
     arrow(0.15, 0.50, 0.20, 0.50)
     arrow(0.32, 0.50, 0.36, 0.50)
@@ -929,7 +1298,7 @@ def figure_05(paths: Paths, outdir: Path) -> Path:
 
     ax.text(0.39, 0.62, "Encoder", fontsize=12, fontweight="bold")
     ax.text(0.26, 0.34, "Decoder", fontsize=12, fontweight="bold")
-    ax.text(0.02, 0.95, "Figure 5: Autoencoder architecture", fontsize=14, fontweight="bold")
+    ax.text(0.02, 0.95, "", fontsize=14, fontweight="bold")
 
     out = outdir / "Figure05_python.png"
     save_figure(fig, out)
@@ -937,7 +1306,9 @@ def figure_05(paths: Paths, outdir: Path) -> Path:
 
 
 def figure_06(paths: Paths, outdir: Path) -> Path:
-    colors = [(0.95, 0.80, 0.45), (0.95, 0.60, 0.60), (0.60, 0.90, 0.90)]
+    # Reference palette for the whole manuscript: these three colours are defined
+    # here and reused as baselines in Figures 7, 8 and 9.
+    colors = SERIES3
     acc_all = np.array([0.9935, 0.9858, 0.9876, 0.9867, 0.9868, 0.9871, 0.9644])
     acc_loso = np.array([0.9964, 0.9855, 0.9902, 0.9869, 0.9854, 0.9877, 0.9653])
     acc_fine = np.array([0.9829, 0.9484, 0.9653, 0.9585, 0.9534, 0.9386, 0.9013])
@@ -945,26 +1316,35 @@ def figure_06(paths: Paths, outdir: Path) -> Path:
         [np.r_[acc_all, acc_all.mean()], np.r_[acc_loso, acc_loso.mean()], np.r_[acc_fine, acc_fine.mean()]]
     ).T * 100
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(FIG_WIDTH_IN, 3.4), constrained_layout=True)
     _grouped_bar(
         ax,
         data,
-        STATIONS_AVG,
-        ["All-station train", "LOSO", "Transfer learning"],
+        STATIONS_AX_AVG,
+        ["Trained on all stations", "Leave-one-station-out", "Transfer learning"],
         colors,
-        (88, 100.5),
+        (88, 101.6),
     )
     ax.set_ylabel("Accuracy (%)")
     ax.set_xlabel("Station")
-    ax.set_title("Figure 6: Accuracy by training strategy")
-    ax.legend(ncol=3, fontsize=9)
+    ax.set_title("")
+    ax.legend(ncol=3, loc="upper center", columnspacing=1.2, handlelength=1.4,
+              handletextpad=0.4, borderaxespad=0.2)
     out = outdir / "Figure06_python.png"
     save_figure(fig, out)
     return out
 
 
 def figure_07(paths: Paths, outdir: Path) -> Path:
-    colors = [(0.95, 0.80, 0.45), (0.95, 0.60, 0.60), (0.60, 0.90, 0.90)]
+    # Colour rule: the original-SNR bars ARE the Figure 4 models, so each panel
+    # keeps that model's Figure 4 colour -- amber for the model trained from
+    # scratch on all stations, turquoise for the transfer-learning model.  The
+    # two SNR variants take the same grey ramp Figure 6 uses for its time-shift
+    # variants, darkening from the high-SNR to the low-SNR training set, so the
+    # baseline is the only coloured bar in either figure.
+    # Series order is [high, original, low].
+    colors_train = [C_ALT_1, C_SCRATCH, C_ALT_2]
+    colors_transfer = [C_ALT_1, C_TRANSFER, C_ALT_2]
     # New model (training) and transfer model under SNR conditions
     A5 = np.array([0.9935, 0.9858, 0.9876, 0.9867, 0.9868, 0.9871, 0.9644, 0.9850]) * 100  # Orig
     B5 = np.array([0.9859, 0.9505, 0.9739, 0.9584, 0.9623, 0.9569, 0.9341, 0.9604]) * 100  # High
@@ -975,19 +1355,23 @@ def figure_07(paths: Paths, outdir: Path) -> Path:
     data_train = np.vstack([B5, A5, C5]).T
     data_transfer = np.vstack([B6, A6, C6]).T
 
-    fig, axes = plt.subplots(2, 1, figsize=(10, 9), constrained_layout=True)
-    _grouped_bar(axes[0], data_train, STATIONS_AVG, ["High-SNR", "Orig-SNR", "Low-SNR"], colors, (90, 101))
-    axes[0].set_ylabel("Accuracy (%)")
-    axes[0].set_title("Figure 7a: New-model accuracy vs training SNR")
-    axes[0].legend(ncol=3, fontsize=9)
+    series = ["Trained on high SNR", "Trained on original SNR", "Trained on low SNR"]
 
-    _grouped_bar(
-        axes[1], data_transfer, STATIONS_AVG, ["High-SNR", "Orig-SNR", "Low-SNR"], colors, (90, 100.5)
-    )
+    fig, axes = plt.subplots(2, 1, figsize=(FIG_WIDTH_IN, 6.0), constrained_layout=True)
+    _grouped_bar(axes[0], data_train, STATIONS_AX_AVG, series, colors_train, (90, 102.4))
+    axes[0].set_ylabel("Accuracy (%)")
+    axes[0].set_title("")
+    axes[0].legend(ncol=3, loc="upper center", columnspacing=1.2, handlelength=1.4,
+                   handletextpad=0.4, borderaxespad=0.2, fontsize=8)
+    panel_label(axes[0], "(a) Model trained from scratch")
+
+    _grouped_bar(axes[1], data_transfer, STATIONS_AX_AVG, series, colors_transfer, (90, 102.0))
     axes[1].set_ylabel("Accuracy (%)")
     axes[1].set_xlabel("Station")
-    axes[1].set_title("Figure 7b: Transfer-learning accuracy vs training SNR")
-    axes[1].legend(ncol=3, fontsize=9)
+    axes[1].set_title("")
+    axes[1].legend(ncol=3, loc="upper center", columnspacing=1.2, handlelength=1.4,
+                   handletextpad=0.4, borderaxespad=0.2, fontsize=8)
+    panel_label(axes[1], "(b) Transfer learning")
 
     out = outdir / "Figure07_python.png"
     save_figure(fig, out)
@@ -995,7 +1379,14 @@ def figure_07(paths: Paths, outdir: Path) -> Path:
 
 
 def figure_08(paths: Paths, outdir: Path) -> Path:
-    colors = [(0.95, 0.80, 0.45), (0.95, 0.60, 0.60), (0.60, 0.90, 0.90)]
+    # Colour rule, as in Figure 5: the sigma = 0 bars ARE the Figure 4 models, so
+    # each panel keeps that model's Figure 4 colour -- amber for the model
+    # trained from scratch on all stations, turquoise for the transfer-learning
+    # model.  The two shifted conditions take the same grey ramp Figure 5 uses
+    # for its SNR variants, so the baseline is the only coloured bar.
+    # Series order is [sigma = 0.00, 0.01, 0.02].
+    colors_train = [C_SCRATCH, C_ALT_1, C_ALT_2]
+    colors_transfer = [C_TRANSFER, C_ALT_1, C_ALT_2]
     ft02 = np.array([0.8278, 0.7496, 0.8066, 0.7712, 0.7533, 0.7358, 0.7455, 0.7700]) * 100
     ft01 = np.array([0.9524, 0.8793, 0.9167, 0.9123, 0.8909, 0.8689, 0.8678, 0.8984]) * 100
     ft00 = np.array([0.9869, 0.9555, 0.9706, 0.9621, 0.9583, 0.9507, 0.9334, 0.9596]) * 100
@@ -1005,17 +1396,25 @@ def figure_08(paths: Paths, outdir: Path) -> Path:
     data_transfer = np.vstack([ft00, ft01, ft02]).T
     data_train = np.vstack([tr00, tr01, tr02]).T
 
-    fig, axes = plt.subplots(2, 1, figsize=(10, 9), constrained_layout=True)
-    _grouped_bar(axes[0], data_train, STATIONS_AVG, ["0.00 s", "0.01 s", "0.02 s"], colors, (70, 105))
-    axes[0].set_ylabel("Accuracy (%)")
-    axes[0].set_title("Figure 8a: New model accuracy vs imposed pick-time shift")
-    axes[0].legend(title="Test-time shift", ncol=3, fontsize=9)
+    series = [r"$\sigma$ = 0.00 s", r"$\sigma$ = 0.01 s", r"$\sigma$ = 0.02 s"]
 
-    _grouped_bar(axes[1], data_transfer, STATIONS_AVG, ["0.00 s", "0.01 s", "0.02 s"], colors, (70, 103))
+    fig, axes = plt.subplots(2, 1, figsize=(FIG_WIDTH_IN, 6.0), constrained_layout=True)
+    _grouped_bar(axes[0], data_train, STATIONS_AX_AVG, series, colors_train, (70, 109))
+    axes[0].set_ylabel("Accuracy (%)")
+    axes[0].set_title("")
+    axes[0].legend(title="Time shift applied to test waveforms", ncol=3, loc="upper center",
+                   columnspacing=1.2, handlelength=1.4, handletextpad=0.4,
+                   borderaxespad=0.2, fontsize=8, title_fontsize=8)
+    panel_label(axes[0], "(a) Model trained from scratch")
+
+    _grouped_bar(axes[1], data_transfer, STATIONS_AX_AVG, series, colors_transfer, (70, 109))
     axes[1].set_ylabel("Accuracy (%)")
     axes[1].set_xlabel("Station")
-    axes[1].set_title("Figure 8b: Transfer model accuracy vs imposed pick-time shift")
-    axes[1].legend(title="Test-time shift", ncol=3, fontsize=9)
+    axes[1].set_title("")
+    axes[1].legend(title="Time shift applied to test waveforms", ncol=3, loc="upper center",
+                   columnspacing=1.2, handlelength=1.4, handletextpad=0.4,
+                   borderaxespad=0.2, fontsize=8, title_fontsize=8)
+    panel_label(axes[1], "(b) Transfer learning")
 
     out = outdir / "Figure08_python.png"
     save_figure(fig, out)
@@ -1023,7 +1422,9 @@ def figure_08(paths: Paths, outdir: Path) -> Path:
 
 
 def figure_09(paths: Paths, outdir: Path) -> Path:
-    colors = [(0.95, 0.80, 0.45), (0.95, 0.60, 0.60), (0.60, 0.90, 0.90)]
+    # Training-shift colours follow Figure 8: 0.01 s -> C_CAT_A, 0.02 s -> C_CAT_B.
+    # The off-diagonal condition (train 0.01 / test 0.02) is shown in neutral grey.
+    colors = SERIES3
     a_train = np.array([0.9942, 0.9483, 0.9789, 0.9668, 0.9598, 0.9631, 0.9466, 0.9655]) * 100
     b_train = np.array([0.9722, 0.9052, 0.9389, 0.9244, 0.9192, 0.9254, 0.8892, 0.9250]) * 100
     c_train = np.array([0.9948, 0.9407, 0.9840, 0.9674, 0.9640, 0.9472, 0.9311, 0.9615]) * 100
@@ -1034,31 +1435,27 @@ def figure_09(paths: Paths, outdir: Path) -> Path:
     data_train = np.vstack([a_train, b_train, c_train]).T
     data_transfer = np.vstack([a_ft, b_ft, c_ft]).T
 
-    fig, axes = plt.subplots(2, 1, figsize=(10, 9), constrained_layout=True)
-    _grouped_bar(
-        axes[0],
-        data_train,
-        STATIONS_AVG,
-        ["Train 0.01 / Test 0.01", "Train 0.01 / Test 0.02", "Train 0.02 / Test 0.01"],
-        colors,
-        (75, 102),
-    )
-    axes[0].set_ylabel("Accuracy (%)")
-    axes[0].set_title("Figure 9a: New model under train/test shift combinations")
-    axes[0].legend(ncol=2, fontsize=8)
+    series = [
+        r"train $\sigma$ = 0.01 s, test $\sigma$ = 0.01 s",
+        r"train $\sigma$ = 0.01 s, test $\sigma$ = 0.02 s",
+        r"train $\sigma$ = 0.02 s, test $\sigma$ = 0.01 s",
+    ]
 
-    _grouped_bar(
-        axes[1],
-        data_transfer,
-        STATIONS_AVG,
-        ["FT 0.01 / Test 0.01", "FT 0.01 / Test 0.02", "FT 0.02 / Test 0.01"],
-        colors,
-        (75, 102),
-    )
+    fig, axes = plt.subplots(2, 1, figsize=(FIG_WIDTH_IN, 6.0), constrained_layout=True)
+    _grouped_bar(axes[0], data_train, STATIONS_AX_AVG, series, colors, (75, 107))
+    axes[0].set_ylabel("Accuracy (%)")
+    axes[0].set_title("")
+    axes[0].legend(ncol=2, loc="upper center", columnspacing=1.0, handlelength=1.4,
+                   handletextpad=0.4, borderaxespad=0.2, fontsize=7.5)
+    panel_label(axes[0], "(a) Model trained from scratch")
+
+    _grouped_bar(axes[1], data_transfer, STATIONS_AX_AVG, series, colors, (75, 107))
     axes[1].set_ylabel("Accuracy (%)")
     axes[1].set_xlabel("Station")
-    axes[1].set_title("Figure 9b: Transfer model under train/test shift combinations")
-    axes[1].legend(ncol=2, fontsize=8)
+    axes[1].set_title("")
+    axes[1].legend(ncol=2, loc="upper center", columnspacing=1.0, handlelength=1.4,
+                   handletextpad=0.4, borderaxespad=0.2, fontsize=7.5)
+    panel_label(axes[1], "(b) Transfer learning")
     out = outdir / "Figure09_python.png"
     save_figure(fig, out)
     return out
@@ -1084,6 +1481,7 @@ def _build_conflict_data(paths: Paths):
     conflict_labels: Dict[str, List[str]] = {s: [] for s in STATIONS}
     valid_loc: Dict[str, List[Tuple[float, float]]] = {s: [] for s in STATIONS}
     conflict_loc: Dict[str, List[Tuple[float, float]]] = {s: [] for s in STATIONS}
+    conflict_id: Dict[str, List[int]] = {s: [] for s in STATIONS}
 
     for row in po_clu:
         rid = int(get_value(row, "ID", -1))
@@ -1110,45 +1508,202 @@ def _build_conflict_data(paths: Paths):
                     conflict_wave[sta].append(w)
                     conflict_labels[sta].append(f"{int(np.sign(p1))} -> {int(np.sign(p2))}")
                     conflict_loc[sta].append((lon, lat))
-    return conflict_wave, conflict_labels, valid_loc, conflict_loc
+                    conflict_id[sta].append(rid)
+    return conflict_wave, conflict_labels, valid_loc, conflict_loc, conflict_id
 
 
 def figure_10(paths: Paths, outdir: Path) -> Path:
-    conflict_wave, conflict_labels, _, _ = _build_conflict_data(paths)
+    """Waveforms where the CC and ML polarity picks disagree.
 
-    fig, axes = plt.subplots(1, 7, figsize=(19, 4.8), constrained_layout=True)
+    Redesigned in response to review comment 47 ("font sizes are ridiculously
+    small; what am I meant to be getting out of this figure?"):
+
+      * 2 x 4 panel grid at 7 in printed width instead of a 1 x 7 strip at 19 in,
+        so nothing is scaled down on the page;
+      * the window is trimmed to +/- 0.25 s about the pick, because the polarity
+        decision is made on the first half cycle and the later coda only crowds
+        the panel;
+      * each trace is annotated as "CC / ML" with an explicit up/down symbol
+        rather than the bare "1 -> -1" string.
+    """
+    conflict_wave, conflict_labels, _, _, _ = _build_conflict_data(paths)
+
+    # Samples: the waveforms are 200 Hz, pick at sample 50 in the 100-sample view
+    # used previously.  Keep 0.25 s (50 samples) either side of the pick.
+    pick = 50
+    half = 50
+    n_trace = 6
+
+    def pretty(label: str) -> str:
+        cc_s, ml_s = label.split(" -> ")
+        sym = {"1": r"$\uparrow$", "-1": r"$\downarrow$"}
+        return f"CC {sym.get(cc_s.strip(), '?')} / ML {sym.get(ml_s.strip(), '?')}"
+
+    fig, axes = plt.subplots(2, 4, figsize=(FIG_WIDTH_WIDE_IN, 5.0), constrained_layout=True)
     rng = np.random.default_rng(42)
-    for ax, sta in zip(axes, STATIONS):
+    for k, (sta, sta_ax) in enumerate(zip(STATIONS, STATIONS_AX)):
+        ax = axes.ravel()[k]
         waves = conflict_wave[sta]
         labels = conflict_labels[sta]
         if not waves:
-            ax.set_title(f"{sta}\n(no conflict)")
+            ax.set_title(f"{sta_ax} (no disagreements)", fontsize=9)
             ax.axis("off")
             continue
-        n_plot = min(len(waves), 10)
+        n_plot = min(len(waves), n_trace)
         picks = rng.choice(len(waves), size=n_plot, replace=False)
+        t = (np.arange(-half, half)) / 200.0
         for i, idx in enumerate(picks, start=1):
-            w = norm_wave(waves[idx][:100])  # match MATLAB xlim [0, 100]
-            ax.plot(np.arange(w.size), w + i, "k-", linewidth=1.2)
-            ax.text(3, i + 0.22, labels[idx], color="b", fontsize=8)
-        ax.axvline(50, color="r", linestyle="--", linewidth=1.0)
-        ax.set_xlim([0, 100])
-        ax.set_ylim([0, 11])
-        ax.set_title(sta, fontsize=10)
+            w = as_1d(waves[idx])
+            lo, hi = pick - half, pick + half
+            if w.size < hi:
+                continue
+            seg = norm_wave(w[lo:hi])
+            ax.plot(t, 0.42 * seg + i, "k-", linewidth=0.8)
+            ax.text(-0.245, i + 0.30, pretty(labels[idx]), color=A_NOTE, fontsize=6.5,
+                    va="center", ha="left")
+        ax.axvline(0.0, color=A_PICK, linestyle="--", linewidth=0.9)
+        ax.set_xlim([-0.25, 0.25])
+        ax.set_ylim([0.3, n_plot + 0.9])
+        ax.set_title(sta_ax, fontsize=9, pad=3)
         ax.set_yticks([])
-        ax.grid(alpha=0.15)
-    fig.suptitle("Figure 10: Conflicting CC vs ML polarity waveforms by station", fontsize=13)
+        ax.set_xticks([-0.2, 0.0, 0.2])
+        ax.tick_params(labelsize=8)
+        ax.grid(axis="x", alpha=0.15, linewidth=0.5)
+        if k >= 4:
+            ax.set_xlabel("Time from P pick (s)", fontsize=8.5)
+
+    # Legend panel in the unused 8th cell.
+    lax = axes.ravel()[7]
+    lax.axis("off")
+    lax.plot([], [], "k-", linewidth=0.8, label="Vertical-component waveform")
+    lax.axvline(np.nan, color=A_PICK, linestyle="--", linewidth=0.9)
+    lax.plot([], [], color=A_PICK, linestyle="--", linewidth=0.9, label="Catalog P pick")
+    lax.legend(loc="center", fontsize=7.5, frameon=False)
+    lax.text(0.5, 0.30, "Labels give the polarity assigned\nby cross-correlation (CC) and by\nAxialPolCap (ML) for the same trace.",
+             transform=lax.transAxes, ha="center", va="top", fontsize=7, color=A_NOTE)
+
+    fig.suptitle("")
     out = outdir / "Figure10_python.png"
     save_figure(fig, out)
     return out
 
 
+def figure_s3(paths: Paths, outdir: Path) -> Path:
+    """Figure S3: CC/ML polarity disagreements, styled like the merged Figure 2.
+
+    Two panels, each holding ten randomly drawn conflicting waveforms, stacked
+    and aligned on the catalog P pick.  Every station contributes at least one
+    trace to a panel and the three remaining slots are filled at random from the
+    stations that still have unused disagreements; the two panels draw disjoint
+    sets of events.  The 1st, 3rd and 4th rows of panel (a), counted from the
+    top, are then swapped for fresh traces of the same stations (see
+    ``resample_top_rows_a`` below), which leaves panel (b) untouched.  Each trace
+    is labelled on the right with its station and event ID.
+    """
+    conflict_wave, conflict_labels, _, _, conflict_id = _build_conflict_data(paths)
+
+    pick, half = 50, 50          # 200 Hz, P pick at sample 50 -> +/- 0.25 s
+    offset = 2.0
+    rng = np.random.default_rng(7)
+
+    sym = {"1": r"$\uparrow$", "-1": r"$\downarrow$"}
+    def pretty(label: str) -> str:
+        cc_s, ml_s = label.split(" -> ")
+        return f"CC {sym.get(cc_s.strip(), '?')} / ML {sym.get(ml_s.strip(), '?')}"
+
+    n_per_panel = 10
+
+    # Usable conflicting traces per station, shuffled once up front so that the
+    # two panels consume disjoint events.
+    pools, cursor = {}, {}
+    for sta in STATIONS:
+        idx = [i for i, w in enumerate(conflict_wave[sta])
+               if as_1d(w).size >= pick + half]
+        rng.shuffle(idx)
+        pools[sta], cursor[sta] = idx, 0
+
+    def take(sta: str):
+        """Next unused conflicting trace for this station, or None."""
+        if cursor[sta] >= len(pools[sta]):
+            return None
+        j = pools[sta][cursor[sta]]
+        cursor[sta] += 1
+        return j
+
+    # two independent draws: every station once, then random extras up to ten
+    draws_meta = []
+    for _ in range(2):
+        picked = []
+        for k, (sta, sta_ax) in enumerate(zip(STATIONS, STATIONS_AX)):
+            j = take(sta)
+            if j is not None:
+                picked.append((k, sta, sta_ax, j))
+        while len(picked) < n_per_panel:
+            avail = [(k, sta, sta_ax)
+                     for k, (sta, sta_ax) in enumerate(zip(STATIONS, STATIONS_AX))
+                     if cursor[sta] < len(pools[sta])]
+            if not avail:
+                break
+            k, sta, sta_ax = avail[int(rng.integers(len(avail)))]
+            picked.append((k, sta, sta_ax, take(sta)))
+        picked.sort(key=lambda r: r[0])          # keep the station order on the page
+        draws_meta.append(picked)
+
+    # Rows of panel (a), counted from the top, that are swapped for fresh traces
+    # of the same station.  The replacements come from pool entries that neither
+    # panel has consumed, so panel (b) is left exactly as drawn.
+    resample_top_rows_a = (1, 3, 4)
+    picked_a = draws_meta[0]
+    for row in resample_top_rows_a:
+        i = len(picked_a) - row                  # rows are stored bottom-up
+        if not 0 <= i < len(picked_a):
+            continue
+        k, sta, sta_ax, _ = picked_a[i]
+        j_new = take(sta)
+        if j_new is not None:
+            picked_a[i] = (k, sta, sta_ax, j_new)
+
+    draws = [[(sta_ax, conflict_id[sta][j], as_1d(conflict_wave[sta][j]),
+               conflict_labels[sta][j])
+              for _, sta, sta_ax, j in picked]
+             for picked in draws_meta]
+
+    fig, axes = plt.subplots(1, 2, figsize=(FIG_WIDTH_IN, 7.2), constrained_layout=True)
+    t = np.arange(-half, half) / 200.0
+    for ax, picked in zip(axes, draws):
+        ticks, labels = [], []
+        for i, (sta_ax, eid, w, lab) in enumerate(picked):
+            seg = norm_wave(w[pick - half:pick + half])
+            yoff = i * offset
+            ax.plot(t, seg + yoff, "b-", linewidth=1.0)
+            ax.text(-0.243, yoff + 0.62, pretty(lab), color=A_NOTE, fontsize=7,
+                    va="center", ha="left")
+            ticks.append(yoff)
+            labels.append(f"{sta_ax}  {eid}")
+        ax.axvline(0.0, color=A_PICK, linestyle="--", linewidth=0.9)
+        ax.yaxis.tick_right()
+        ax.set_yticks(ticks)
+        ax.set_yticklabels(labels, fontsize=7)
+        ax.tick_params(axis="y", length=0)
+        ax.set_xlim([-0.25, 0.25])
+        ax.set_ylim([-offset, len(picked) * offset])
+        ax.set_xlabel("Time from P pick (s)")
+        ax.grid(alpha=0.2)
+
+    for ax, lab in zip(axes, ("(a)", "(b)")):
+        panel_label(ax, lab)
+
+    out = outdir / "FigureS03_python.png"
+    save_figure(fig, out)
+    return out
+
+
 def figure_11(paths: Paths, outdir: Path) -> Path:
-    _, _, valid_loc, conflict_loc = _build_conflict_data(paths)
+    _, _, valid_loc, conflict_loc, _ = _build_conflict_data(paths)
     lon_lim = [-130.031, -129.97]
     lat_lim = [45.92, 45.972]
 
-    fig, axes = plt.subplots(3, 3, figsize=(11, 9), constrained_layout=True)
+    fig, axes = plt.subplots(3, 3, figsize=(FIG_WIDTH_IN, 6.6), constrained_layout=True)
     for i, sta in enumerate(STATIONS):
         ax = axes.ravel()[i]
         valid = np.array(valid_loc[sta], dtype=float) if valid_loc[sta] else np.empty((0, 2))
@@ -1173,7 +1728,7 @@ def figure_11(paths: Paths, outdir: Path) -> Path:
             ax.set_xlabel("Longitude")
     axes.ravel()[7].axis("off")
     axes.ravel()[8].axis("off")
-    fig.suptitle("Figure 11: Spatial agreement (gray) vs conflict (blue)", fontsize=13)
+    fig.suptitle("")
     out = outdir / "Figure11_python.png"
     save_figure(fig, out)
     return out
@@ -1397,7 +1952,7 @@ def figure_12(paths: Paths, outdir: Path) -> Path:
             return date_bf <= t < date_dr
         return t >= date_dr
 
-    fig, axes = plt.subplots(2, 3, figsize=(12, 9), constrained_layout=True)
+    fig, axes = plt.subplots(2, 3, figsize=(FIG_WIDTH_IN, 4.1), constrained_layout=True)
     panel_labels = ["(a)", "(b)", "(c)", "(d)", "(e)", "(f)"]
     col_titles = ["Before", "During", "After"]
     catalogs = [event_a, event_b]
@@ -1428,6 +1983,15 @@ def figure_12(paths: Paths, outdir: Path) -> Path:
             ax.set_xlim(lon_lim)
             ax.set_ylim(lat_lim)
             _set_geo_aspect(ax, lon_lim, lat_lim)
+            ax.set_xticks([-130.02, -130.00, -129.98])
+            ax.set_yticks([45.93, 45.94, 45.95, 45.96, 45.97])
+            ax.xaxis.set_major_formatter(FormatStrFormatter("%.2f"))
+            ax.yaxis.set_major_formatter(FormatStrFormatter("%.2f"))
+            ax.tick_params(labelsize=7.5)
+            if c > 0:
+                ax.set_yticklabels([])
+            if r == 0:
+                ax.set_xticklabels([])
             ax.grid(alpha=0.2)
             ax.text(lon_lim[0] + 0.002, lat_lim[1] - 0.002, panel_labels[r * 3 + c], fontsize=12, fontweight="bold")
             if r == 0:
@@ -1441,7 +2005,7 @@ def figure_12(paths: Paths, outdir: Path) -> Path:
             else:
                 ax.set_xticklabels([])
 
-    fig.suptitle("Figure 12: Focal-mechanism comparison (CC vs AxialPolCap catalogs)", fontsize=13)
+    fig.suptitle("")
     out = outdir / "Figure12_python.png"
     save_figure(fig, out)
     return out
@@ -1606,25 +2170,36 @@ def figure_13(paths: Paths, outdir: Path) -> Path:
     m = np.isfinite(kg) & np.isfinite(lon) & np.isfinite(lat)
     kg, lon, lat = kg[m], lon[m], lat[m]
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
+    fig, axes = plt.subplots(1, 2, figsize=(FIG_WIDTH_IN, 3.0), constrained_layout=True)
     axes[0].hist(kg, bins=np.linspace(0, 120, 25), color=(0.2, 0.4, 0.9), edgecolor="k")
     axes[0].set_xlim([0, 120])
     axes[0].grid(alpha=0.2)
     axes[0].set_xlabel("Kagan angle (deg)")
     axes[0].set_ylabel("Count")
-    axes[0].set_title(f"Figure 13a: Histogram (mean={np.mean(kg):.2f}, median={np.median(kg):.2f})")
+    axes[0].set_title("")
+    panel_label(axes[0], "(a)")
 
-    sc = axes[1].scatter(lon, lat, c=kg, s=7, cmap="jet")
-    axes[1].plot(CALDERA_RIM[:, 0], CALDERA_RIM[:, 1], "k-", linewidth=1.5)
+    sc = axes[1].scatter(lon, lat, c=kg, s=6, cmap=SEQ_CMAP, vmin=0, vmax=120,
+                         linewidths=0)
+    axes[1].plot(CALDERA_RIM[:, 0], CALDERA_RIM[:, 1], "k-", linewidth=1.0)
     axes[1].set_xlim([-130.03, -129.97])
     axes[1].set_ylim([45.92, 45.97])
     _set_geo_aspect(axes[1], [-130.03, -129.97], [45.92, 45.97])
-    axes[1].grid(alpha=0.2)
+    axes[1].grid(alpha=0.15, linewidth=0.5)
     axes[1].set_xlabel("Longitude")
     axes[1].set_ylabel("Latitude")
-    axes[1].set_title("Figure 13b: Spatial Kagan distribution")
-    cb = fig.colorbar(sc, ax=axes[1], shrink=0.75)
-    cb.set_label("Kagan (deg)")
+    axes[1].set_title("")
+    # Absolute longitudes, matching Figure 11; the default offset notation
+    # rendered these as "-1.3e2" which is unreadable.
+    axes[1].set_xticks([-130.02, -130.00, -129.98])
+    axes[1].set_yticks([45.93, 45.94, 45.95, 45.96, 45.97])
+    axes[1].xaxis.set_major_formatter(FormatStrFormatter("%.2f"))
+    axes[1].yaxis.set_major_formatter(FormatStrFormatter("%.2f"))
+    axes[1].tick_params(labelsize=8)
+    panel_label(axes[1], "(b)")
+    cb = fig.colorbar(sc, ax=axes[1], shrink=0.85, aspect=18)
+    cb.set_label("Kagan angle (deg)", fontsize=9)
+    cb.ax.tick_params(labelsize=8)
 
     out = outdir / "Figure13_python.png"
     save_figure(fig, out)
@@ -1632,58 +2207,141 @@ def figure_13(paths: Paths, outdir: Path) -> Path:
 
 
 def figure_14(paths: Paths, outdir: Path) -> Path:
-    fig, ax = plt.subplots(figsize=(14, 6))
+    """Real-time focal-mechanism pipeline schematic.
+
+    Re-laid out for the printed page width.  The previous version was drawn on a
+    14 x 6 in canvas with 10-14 pt type; at the size Word actually placed it the
+    labels overflowed their boxes and the right-hand column ran off the figure.
+    Coordinates below are chosen for a 7.2 x 4.4 in canvas, and the in-figure
+    title was removed because the caption carries it.
+    """
+    fig_w, fig_h = FIG_WIDTH_WIDE_IN, 4.4
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
     ax.axis("off")
 
-    def rect(x, y, w, h, txt, fc, bold=False):
-        p = FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.02,rounding_size=0.02", facecolor=fc, edgecolor="black", linewidth=1.2)
-        ax.add_patch(p)
-        ax.text(x + w / 2, y + h / 2, txt, ha="center", va="center", fontsize=10, fontweight="bold" if bold else "normal")
+    FS = 7.0        # box text
+    FS_HEAD = 7.5   # group headers
 
-    def ellipse(x, y, w, h, txt, fc):
-        e = Ellipse((x + w / 2, y + h / 2), w, h, facecolor=fc, edgecolor="black", linewidth=1.2)
-        ax.add_patch(e)
-        ax.text(x + w / 2, y + h / 2, txt, ha="center", va="center", fontsize=10)
+    def rect(x, y, w, h, txt, fc="white", bold=False):
+        ax.add_patch(FancyBboxPatch(
+            (x, y), w, h,
+            boxstyle="round,pad=0.004,rounding_size=0.012",
+            facecolor=fc, edgecolor="black", linewidth=0.8,
+        ))
+        ax.text(x + w / 2, y + h / 2, txt, ha="center", va="center",
+                fontsize=FS_HEAD if bold else FS,
+                fontweight="bold" if bold else "normal")
+
+    def ellipse(cx, cy, w, h, txt, fc):
+        ax.add_patch(Ellipse((cx, cy), w, h, facecolor=fc, edgecolor="black", linewidth=0.8))
+        ax.text(cx, cy, txt, ha="center", va="center", fontsize=FS)
 
     def hexagon(cx, cy, r, txt, fc):
+        # Compensate for the non-square axes so the hexagon reads as regular.
         th = np.linspace(0, 2 * np.pi, 7)
-        pts = np.c_[cx + r * np.cos(th), cy + r * np.sin(th)]
-        ax.add_patch(Polygon(pts, closed=True, facecolor=fc, edgecolor="black", linewidth=1.3))
-        ax.text(cx, cy, txt, ha="center", va="center", fontsize=10)
+        pts = np.c_[cx + r * np.cos(th), cy + r * (fig_w / fig_h) * np.sin(th)]
+        ax.add_patch(Polygon(pts, closed=True, facecolor=fc, edgecolor="black", linewidth=0.9))
+        ax.text(cx, cy, txt, ha="center", va="center", fontsize=FS, fontweight="bold")
 
     def arr(x1, y1, x2, y2):
-        ax.annotate("", xy=(x2, y2), xytext=(x1, y1), arrowprops=dict(arrowstyle="->", lw=1.4))
+        ax.annotate("", xy=(x2, y2), xytext=(x1, y1),
+                    arrowprops=dict(arrowstyle="-|>", lw=0.9, color="0.25",
+                                    shrinkA=1.5, shrinkB=1.5))
 
-    rect(0.05, 0.70, 0.22, 0.07, "Input", (0.83, 0.93, 0.83), True)
-    rect(0.05, 0.64, 0.22, 0.05, "3-channel waveform", (1, 1, 1))
-    rect(0.33, 0.48, 0.18, 0.07, "S/P amplitude ratios", (1, 1, 1))
-    ellipse(0.58, 0.57, 0.18, 0.10, "Trained + Fine-tuned", (1, 1, 0.85))
-    rect(0.82, 0.58, 0.15, 0.08, "First-motion polarity", (1, 1, 1))
-    rect(0.05, 0.27, 0.22, 0.05, "Earthquake location", (1, 1, 1))
-    rect(0.05, 0.22, 0.22, 0.05, "Station location", (1, 1, 1))
-    rect(0.05, 0.17, 0.22, 0.05, "Velocity model", (1, 1, 1))
-    hexagon(0.62, 0.32, 0.07, "SKHASH", (0.80, 0.87, 1.0))
-    rect(0.82, 0.40, 0.15, 0.07, "Focal mechanism", (0.83, 0.93, 0.83), True)
-    rect(0.82, 0.35, 0.15, 0.05, "Strike", (1, 1, 1))
-    rect(0.82, 0.30, 0.15, 0.05, "Dip", (1, 1, 1))
-    rect(0.82, 0.25, 0.15, 0.05, "Rake", (1, 1, 1))
-    rect(0.82, 0.15, 0.15, 0.07, "Stress inversion", (0.83, 0.93, 0.83), True)
-    rect(0.82, 0.10, 0.15, 0.05, "P axis", (1, 1, 1))
-    rect(0.82, 0.05, 0.15, 0.05, "T axis", (1, 1, 1))
-    rect(0.82, 0.00, 0.15, 0.05, "Shape ratio", (1, 1, 1))
+    # --- top flow: waveform -> model -> polarity -------------------------------
+    rect(0.01, 0.865, 0.21, 0.062, "Input", TINT_POOL, bold=True)
+    rect(0.01, 0.800, 0.21, 0.062, "3-component waveform")
+    ellipse(0.42, 0.862, 0.21, 0.115, "AxialPolCap", TINT_REG)
+    rect(0.62, 0.831, 0.22, 0.062, "First-motion polarity")
+    arr(0.225, 0.862, 0.312, 0.862)
+    arr(0.528, 0.862, 0.617, 0.862)
 
-    arr(0.27, 0.615, 0.33, 0.615)
-    arr(0.51, 0.615, 0.58, 0.615)
-    arr(0.76, 0.615, 0.82, 0.615)
-    arr(0.42, 0.48, 0.58, 0.36)
-    arr(0.27, 0.215, 0.58, 0.31)
-    arr(0.88, 0.57, 0.66, 0.35)
-    arr(0.69, 0.32, 0.82, 0.32)
+    # --- secondary inputs ------------------------------------------------------
+    rect(0.26, 0.600, 0.22, 0.062, "S/P amplitude ratios")
+    rect(0.01, 0.300, 0.21, 0.058, "Earthquake location")
+    rect(0.01, 0.238, 0.21, 0.058, "Station location")
+    rect(0.01, 0.176, 0.21, 0.058, "Velocity model")
 
-    ax.text(0.02, 0.98, "Figure 14: Real-time focal-mechanism pipeline", fontsize=14, fontweight="bold", va="top")
+    # --- inversion -------------------------------------------------------------
+    hexagon(0.535, 0.400, 0.075, "SKHASH", TINT_CONV)
+    arr(0.730, 0.828, 0.590, 0.505)
+    arr(0.370, 0.597, 0.487, 0.487)
+    arr(0.225, 0.245, 0.462, 0.372)
 
+    # --- outputs ---------------------------------------------------------------
+    rect(0.76, 0.520, 0.23, 0.062, "Focal mechanism", TINT_POOL, bold=True)
+    rect(0.76, 0.458, 0.23, 0.058, "Strike")
+    rect(0.76, 0.400, 0.23, 0.058, "Dip")
+    rect(0.76, 0.342, 0.23, 0.058, "Rake")
+    rect(0.76, 0.222, 0.23, 0.062, "Stress inversion", TINT_POOL, bold=True)
+    rect(0.76, 0.160, 0.23, 0.058, "P axis")
+    rect(0.76, 0.102, 0.23, 0.058, "T axis")
+    rect(0.76, 0.044, 0.23, 0.058, "Shape ratio")
+    arr(0.612, 0.400, 0.755, 0.400)
+    arr(0.875, 0.340, 0.875, 0.288)
+
+    fig.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.01)
     out = outdir / "Figure14_python.png"
     save_figure(fig, out)
+    return out
+
+
+def write_benchmark_table(outdir: Path) -> Path:
+    """Supplementary table of per-station benchmark accuracies (review comment 16:
+    "the reader might wonder which performs best of the DL models").
+
+    Numbers are the same ones plotted in Figure 4.
+    """
+    # DiTingMotion, EQPolarity and PolarCAP re-run 2026-09-18; CFM and the
+    # cross-correlation baseline are unchanged and keep their original values.
+    diting = np.array([94.1, 70.9, 85.8, 76.2, 81.6, 66.2, 84.8])
+    cfm = np.array([97.0, 81.0, 97.4, 88.3, 87.1, 82.9, 74.5])
+    eqp = np.array([96.5, 79.4, 96.8, 87.1, 86.0, 83.3, 75.4])
+    polcap = np.array([96.1, 79.8, 97.3, 87.8, 86.4, 81.9, 75.4])
+    cc = np.array([0.99972, 0.95991, 0.99134, 0.93391, 0.84833, 0.87012, 0.80463]) * 100
+
+    methods = [
+        ("DiTingMotion", diting),
+        ("CFM", cfm),
+        ("EQPolarity", eqp),
+        ("PolarCAP", polcap),
+        ("Cross-correlation", cc),
+    ]
+
+    lines = [
+        "Table S1. Station-wise P-wave first-motion polarity accuracy (%) on the "
+        "synthetic benchmark data set, for four published deep-learning classifiers "
+        "and the cross-correlation method. Accuracies are measured against the "
+        "manually verified template polarities.",
+        "",
+        "| Method | " + " | ".join(STATIONS_AX) + " | Average |",
+        "|" + "---|" * (len(STATIONS_AX) + 2),
+    ]
+    # Average column is the pooled accuracy, matching the Average bar of
+    # Figure 3 and the confusion matrices of Figure S1.
+    pooled = {k: 100.0 * (v[0][0] + v[1][1]) / sum(v[0] + v[1])
+              for k, v in CM_COUNTS.items()}
+    avg = {name: pooled.get(name, arr.mean()) for name, arr in methods}
+
+    for name, arr in methods:
+        cells = " | ".join(f"{v:.1f}" for v in arr)
+        lines.append(f"| {name} | {cells} | **{avg[name]:.1f}** |")
+
+    best = max(methods[:4], key=lambda m: avg[m[0]])
+    worst = min(methods[:4], key=lambda m: avg[m[0]])
+    lines += [
+        "",
+        f"Best deep-learning model: {best[0]} ({avg[best[0]]:.1f}% average).",
+        f"Worst deep-learning model: {worst[0]} ({avg[worst[0]]:.1f}% average).",
+        f"Deep-learning range: {min(avg[m[0]] for m in methods[:4]):.1f}-"
+        f"{max(avg[m[0]] for m in methods[:4]):.1f}%; "
+        f"cross-correlation: {cc.mean():.1f}%.",
+    ]
+
+    out = outdir / "TableS1_benchmark_accuracy.md"
+    out.write_text("\n".join(lines) + "\n")
     return out
 
 
@@ -1702,6 +2360,9 @@ FIGURE_FUNCS = {
     12: figure_12,
     13: figure_13,
     14: figure_14,
+    15: figure_02_merged,   # merged replacement for Figures 2 and 3 (AXAS2 only)
+    17: figure_s_confusion,  # supplementary: benchmark confusion matrices
+    16: figure_s3,           # supplementary Figure S3 (replaces old Figure 10)
 }
 
 
@@ -1714,8 +2375,8 @@ def parse_figure_ids(figures: str) -> List[int]:
         if not part:
             continue
         v = int(part)
-        if v < 1 or v > 14:
-            raise ValueError("Figure ids must be in [1,14]")
+        if v < 1 or v > 17:
+            raise ValueError("Figure ids must be in [1,17] (15 = merged Figure 2+3, 16 = Figure S3, 17 = supplementary confusion matrices)")
         out.append(v)
     return sorted(set(out))
 
@@ -1744,16 +2405,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    import matplotlib
-    matplotlib.rcParams.update({
-        "font.family": "Times New Roman",
-        "font.size": 12,
-        "axes.labelsize": 12,
-        "axes.titlesize": 12,
-        "xtick.labelsize": 12,
-        "ytick.labelsize": 12,
-        "legend.fontsize": 12,
-    })
+    apply_manuscript_style()
 
     paths = Paths(
         repo_root=default_repo,
@@ -1783,6 +2435,10 @@ def main() -> None:
                     print(f"[FALLBACK] Extracted Figure {fid:02d} image from docx -> {out}")
                 else:
                     print(f"[FALLBACK-FAIL] Could not extract image{fid}.png from docx")
+
+    if 4 in fig_ids:
+        tbl = write_benchmark_table(outdir)
+        print(f"[OK] Table S1 -> {tbl}")
 
 
 if __name__ == "__main__":
