@@ -1,0 +1,12 @@
+LICENSE
+README.md
+setup.py
+eqpolarity/__init__.py
+eqpolarity/plot.py
+eqpolarity/utils.py
+eqpolarity.egg-info/PKG-INFO
+eqpolarity.egg-info/SOURCES.txt
+eqpolarity.egg-info/dependency_links.txt
+eqpolarity.egg-info/not-zip-safe
+eqpolarity.egg-info/requires.txt
+eqpolarity.egg-info/top_level.txt

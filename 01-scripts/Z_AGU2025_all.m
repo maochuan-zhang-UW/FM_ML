@@ -23,17 +23,35 @@ stations = {'AS1','AS2','CC1','EC1','EC2','EC3','ID1'};
 stations_avg = [stations, {'Average'}];
 
 % Accuracy values
-DiTIng     = [97.03 78.23 97.86 89.10 88.04 77.03 73.23];
+% DiTingMotion/CFM/EQPolarity/PolCap (official pretrained PolarCAP, run
+% zero-shot) recomputed live from the shared 6801-event, 7-station Axial
+% Seamount benchmark set -- see 01-scripts/{DiTing-FOCALFLOW,CFM,eqpolarity,
+% PolarCAP} for the inference scripts and
+% 02-data/F_ML/A_wave_dB15_DT_CFM_EQP_PolCAP.mat for the combined predictions.
+DiTIng     = [94.14 70.87 85.81 76.20 81.63 66.20 84.75];
 CFM        = [97.03 80.98 97.35 88.27 87.12 82.91 74.46];
-EQPolarity = [92.85 76.57 90.85 85.16 83.09 80.64 72.49];
-PolCap     = [0.7942 0.7270 0.8186 0.7699 0.8307 0.7617 0.6857] * 100;
+EQPolarity = [96.51 79.44 96.78 87.06 86.02 83.29 75.40];
+PolCap     = [96.10 79.83 97.26 87.75 86.36 81.88 75.40];
+% CC baseline: NOT recomputed (semi-manual pick pipeline requiring
+% MATLAB ginput/uicontrol review; evaluated on its own, largely
+% non-overlapping ~1000-event/station set) -- reused as-is from
+% 01-scripts/H_compare_Man_CC.m's output.
 CC_ratio   = [0.99972 0.95991 0.99134 0.93391 0.84833 0.87012 0.80463] * 100;
 
 % Add averages
-DiTIng_A     = [DiTIng     mean(DiTIng)];
-CFM_A        = [CFM        mean(CFM)];
-EQPolarity_A = [EQPolarity mean(EQPolarity)];
-PolCap_A     = [PolCap     mean(PolCap)];
+% NOTE: the "Average" bar is the POOLED accuracy (all 7 stations' events
+% combined, i.e. total correct / total N), NOT mean(per-station %) -- those
+% disagree whenever stations have unequal event counts (e.g. DiTingMotion
+% abstains ["undecided"] far more often at some stations than others).
+% Pooled values from 03-output/Figure04_confusion_matrix.csv "ALL (pooled)"
+% rows / 04-manuscripts/python_figures/make_manuscript_figures.py's
+% _pooled_accuracy(). CC's average is still a plain mean since its
+% per-station event counts aren't available in this pipeline (see note
+% above on the CC baseline's separate data source).
+DiTIng_A     = [DiTIng     82.41];
+CFM_A        = [CFM        88.49];
+EQPolarity_A = [EQPolarity 87.83];
+PolCap_A     = [PolCap     87.89];
 CC_ratio_A   = [CC_ratio   mean(CC_ratio)];
 
 %% ==============================
@@ -65,7 +83,7 @@ ylabel('Accuracy (%)','FontSize',LABEL_FONT_SIZE,'FontWeight','bold');
 xlabel('Stations','FontSize',LABEL_FONT_SIZE,'FontWeight','bold');
 title('Accuracy of Existing DL Models vs Cross-Correlation','FontSize',TITLE_FONT_SIZE,'FontWeight','bold');
 
-legend({'DiTing','CFM','EQPolarity','PolCap','CC'}, ...
+legend({'DiTingMotion','CFM','EQPolarity','PolarCAP','CC'}, ...
        'Location',"northeast",'NumColumns',3,'FontSize',LEGEND_FONT_SIZE);
 
 set(gca,'FontSize',AXIS_FONT_SIZE,'LineWidth',1.5);

@@ -1,0 +1,12 @@
+Model: APPNET_LOLITA
+num_filter: [16, 32, 64]
+filter_size: 3
+num_dense: 128
+epochs: 100
+batch_size: 256
+monitor: val_loss
+mode: min
+patience: 5
+time_input: (400, 1)
+class: 3
+loss: ['mse', 'categorical_crossentropy']

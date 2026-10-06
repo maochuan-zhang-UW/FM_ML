@@ -210,7 +210,58 @@ def extract_docx_image(paths: Paths, fig_num: int, out_path: Path) -> bool:
     return True
 
 
+# --- SRL (Seismological Research Letters) maintext figure export mode -----
+# When enabled: descriptive "Figure N: ..." titles are dropped (panel letters
+# like (a)/(b) are kept), each figure is rescaled to a real SRL column width,
+# and figures are saved as individual files with no in-figure numbering --
+# that belongs in the manuscript caption, not the image.
+SRL_MODE = False
+SRL_SINGLE_COL_IN = 3.34  # 8.5 cm
+SRL_DOUBLE_COL_IN = 6.90  # 17.5 cm
+
+
+def srl_title(ax_or_fig, panel_label: Optional[str], full_title: str, method: str = "set_title", **kwargs) -> None:
+    """Set a descriptive title normally; in SRL_MODE, show only the panel
+    letter (e.g. "(a)"), or nothing for single-panel figures."""
+    if SRL_MODE:
+        if panel_label:
+            getattr(ax_or_fig, method)(panel_label, loc="left", fontweight="bold")
+        return
+    getattr(ax_or_fig, method)(full_title, **kwargs)
+
+
+def srl_text_title(ax, x: float, y: float, panel_label: Optional[str], full_title: str, **kwargs) -> None:
+    """Like srl_title, but for schematics that place their title via ax.text()
+    rather than a real axes title."""
+    if SRL_MODE:
+        if panel_label:
+            kwargs.pop("fontweight", None)
+            ax.text(x, y, panel_label, fontweight="bold", **kwargs)
+        return
+    ax.text(x, y, full_title, **kwargs)
+
+
+def finalize_srl_size(fig: plt.Figure, width_in: float = SRL_DOUBLE_COL_IN) -> None:
+    if not SRL_MODE:
+        return
+    w, _h = fig.get_size_inches()
+    if w <= 0:
+        return
+    scale = width_in / w
+    fig.set_size_inches(fig.get_size_inches() * scale)
+    # Shrinking the canvas alone (fonts are fixed in points, not tied to
+    # figsize) makes text occupy a larger relative fraction of the image and
+    # collide on dense multi-panel/inset figures. Scale every text object's
+    # size together with the canvas so the original proportions -- which
+    # were already tuned to look right -- are preserved, just at the smaller
+    # physical size.
+    for text_obj in fig.findobj(match=lambda o: isinstance(o, plt.Text)):
+        size = text_obj.get_fontsize()
+        text_obj.set_fontsize(size * scale)
+
+
 def save_figure(fig: plt.Figure, out_path: Path, dpi: int = 300) -> None:
+    finalize_srl_size(fig)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out_path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
@@ -684,6 +735,7 @@ def figure_01(paths: Paths, outdir: Path) -> Path:
 
         out = outdir / "Figure01_python.png"
         out.parent.mkdir(parents=True, exist_ok=True)
+        finalize_srl_size(fig)
         fig.savefig(out, dpi=300, bbox_inches="tight", pad_inches=0.02)
         plt.close(fig)
         return out
@@ -744,7 +796,7 @@ def figure_02(paths: Paths, outdir: Path) -> Path:
             axes[0, i].set_ylabel("Normalized amplitude")
             axes[1, i].set_ylabel("Normalized amplitude")
         axes[1, i].set_xlabel("Time (s)")
-    fig.suptitle("Figure 2: Template and noise waveforms by station", fontsize=14)
+    srl_title(fig, None, "Figure 2: Template and noise waveforms by station", method="suptitle", fontsize=14)
     out = outdir / "Figure02_python.png"
     save_figure(fig, out)
     return out
@@ -801,7 +853,7 @@ def figure_03(paths: Paths, outdir: Path) -> Path:
     ax.set_yticks([])
     ax.set_xlabel("Sample index")
     ax.set_ylabel("Normalized waveform (stacked)")
-    ax.set_title("Figure 3: AS1 augmentation examples with target SNR")
+    srl_title(ax, None, "Figure 3: AS1 augmentation examples with target SNR")
     ax.grid(alpha=0.15)
     out = outdir / "Figure03_python.png"
     save_figure(fig, out)
@@ -820,28 +872,80 @@ def _grouped_bar(ax: plt.Axes, data: np.ndarray, labels: Sequence[str], series: 
     ax.grid(axis="y", alpha=0.25)
 
 
+def _station_accuracy(felix: np.ndarray, po_field: str, pred_field: str) -> float:
+    po = as_1d([get_value(r, po_field, 0) for r in felix])
+    pred = as_1d([get_value(r, pred_field, 0) for r in felix])
+    mask = (po != 0) & (pred != 0)
+    if not np.any(mask):
+        return float("nan")
+    return float(np.mean(po[mask] == pred[mask])) * 100
+
+
+def _pooled_accuracy(felix: np.ndarray, prefix: str) -> float:
+    """Accuracy over all stations' events pooled together (matches the
+    confusion-matrix "ALL (pooled)" row in Figure04_confusion_matrix.csv),
+    as opposed to a plain unweighted mean of the per-station percentages --
+    those disagree whenever stations have unequal event counts."""
+    correct_tot = 0
+    n_tot = 0
+    for s in STATIONS:
+        po = as_1d([get_value(r, f"Po_{s}", 0) for r in felix])
+        pred = as_1d([get_value(r, f"{prefix}{s}", 0) for r in felix])
+        mask = (po != 0) & (pred != 0)
+        correct_tot += int(np.sum(po[mask] == pred[mask]))
+        n_tot += int(np.sum(mask))
+    return 100 * correct_tot / n_tot if n_tot else float("nan")
+
+
 def figure_04(paths: Paths, outdir: Path) -> Path:
     colors = [(0.95, 0.80, 0.45), (0.95, 0.60, 0.60), (0.60, 0.90, 0.90), (0.60, 0.80, 0.60), (0.75, 0.65, 0.95)]
-    diting = np.array([97.03, 78.23, 97.86, 89.10, 88.04, 77.03, 73.23])
-    cfm = np.array([97.03, 80.98, 97.35, 88.27, 87.12, 82.91, 74.46])
-    eqp = np.array([92.85, 76.57, 90.85, 85.16, 83.09, 80.64, 72.49])
-    polcap = np.array([0.7942, 0.7270, 0.8186, 0.7699, 0.8307, 0.7617, 0.6857]) * 100
+
+    # DiTingMotion, CFM, EQPolarity, and PolarCAP (official pretrained SAIPy
+    # weights, run zero-shot) computed live from the shared 6801-event, 7-station
+    # Axial Seamount benchmark set -- see 01-scripts/{DiTing-FOCALFLOW,CFM,
+    # eqpolarity,PolarCAP} for the inference scripts and
+    # 02-data/F_ML/A_wave_dB15_DT_CFM_EQP_PolCAP.mat for the combined predictions.
+    master_mat = paths.repo_root / "02-data" / "F_ML" / "A_wave_dB15_DT_CFM_EQP_PolCAP.mat"
+    felix = load_struct_array(master_mat, "Felix")
+
+    diting = np.array([_station_accuracy(felix, f"Po_{s}", f"PoML_W_{s}") for s in STATIONS])
+    cfm = np.array([_station_accuracy(felix, f"Po_{s}", f"CFM_W_{s}") for s in STATIONS])
+    eqp = np.array([_station_accuracy(felix, f"Po_{s}", f"EQP_{s}") for s in STATIONS])
+    polcap = np.array([_station_accuracy(felix, f"Po_{s}", f"PolCAP_{s}") for s in STATIONS])
+
+    # "Average" bar = pooled accuracy (all stations' events combined), not a
+    # plain mean of the per-station percentages -- the latter weights every
+    # station equally regardless of how many events it contributes, which
+    # disagrees with the pooled confusion-matrix numbers.
+    diting_avg = _pooled_accuracy(felix, "PoML_W_")
+    cfm_avg = _pooled_accuracy(felix, "CFM_W_")
+    eqp_avg = _pooled_accuracy(felix, "EQP_")
+    polcap_avg = _pooled_accuracy(felix, "PolCAP_")
+
+    # CC baseline: NOT recomputed here. It comes from a semi-manual pick
+    # pipeline (01-scripts/{B_CC_combined,C_align_manualpick*,
+    # D_manual_pick_station*}.m, which require human-reviewed picks via
+    # MATLAB ginput/uicontrol) evaluated on its own ~1000-event/station set in
+    # 02-data/D_man/D_manual_<station>_CCPo.mat -- a largely different (only
+    # ~145/1000 CC1 events overlap) sample from the 6801-event DL benchmark
+    # set above. Reused as-is from 01-scripts/H_compare_Man_CC.m's output.
     cc = np.array([0.99972, 0.95991, 0.99134, 0.93391, 0.84833, 0.87012, 0.80463]) * 100
+
     data = np.vstack(
         [
-            np.r_[diting, diting.mean()],
-            np.r_[cfm, cfm.mean()],
-            np.r_[eqp, eqp.mean()],
-            np.r_[polcap, polcap.mean()],
+            np.r_[diting, diting_avg],
+            np.r_[cfm, cfm_avg],
+            np.r_[eqp, eqp_avg],
+            np.r_[polcap, polcap_avg],
             np.r_[cc, cc.mean()],
         ]
     ).T
 
     fig, ax = plt.subplots(figsize=(11, 6))
-    _grouped_bar(ax, data, STATIONS_AVG, ["DiTingMotion", "CFM", "EQPolarity", "AxialPolCap", "CC"], colors, (60, 100))
+    _grouped_bar(ax, data, STATIONS_AVG, ["DiTingMotion", "CFM", "EQPolarity", "PolarCAP", "CC"], colors, (60, 100))
     ax.set_ylabel("Accuracy (%)")
     ax.set_xlabel("Station")
-    ax.set_title("Figure 4: Benchmark accuracy by station")
+    srl_title(ax, None, "Figure 4: Benchmark accuracy by station")
     ax.legend(ncol=3, fontsize=9)
     out = outdir / "Figure04_python.png"
     save_figure(fig, out)
@@ -892,7 +996,7 @@ def figure_05(paths: Paths, outdir: Path) -> Path:
 
     ax.text(0.39, 0.62, "Encoder", fontsize=12, fontweight="bold")
     ax.text(0.26, 0.34, "Decoder", fontsize=12, fontweight="bold")
-    ax.text(0.02, 0.95, "Figure 5: Autoencoder architecture", fontsize=14, fontweight="bold")
+    srl_text_title(ax, 0.02, 0.95, None, "Figure 5: Autoencoder architecture", fontsize=14, fontweight="bold")
 
     out = outdir / "Figure05_python.png"
     save_figure(fig, out)
@@ -919,7 +1023,7 @@ def figure_06(paths: Paths, outdir: Path) -> Path:
     )
     ax.set_ylabel("Accuracy (%)")
     ax.set_xlabel("Station")
-    ax.set_title("Figure 6: Accuracy by training strategy")
+    srl_title(ax, None, "Figure 6: Accuracy by training strategy")
     ax.legend(ncol=3, fontsize=9)
     out = outdir / "Figure06_python.png"
     save_figure(fig, out)
@@ -941,7 +1045,7 @@ def figure_07(paths: Paths, outdir: Path) -> Path:
     fig, axes = plt.subplots(2, 1, figsize=(10, 9), constrained_layout=True)
     _grouped_bar(axes[0], data_train, STATIONS_AVG, ["High-SNR", "Orig-SNR", "Low-SNR"], colors, (90, 101))
     axes[0].set_ylabel("Accuracy (%)")
-    axes[0].set_title("Figure 7a: New-model accuracy vs training SNR")
+    srl_title(axes[0], "(a)", "Figure 7a: New-model accuracy vs training SNR")
     axes[0].legend(ncol=3, fontsize=9)
 
     _grouped_bar(
@@ -949,7 +1053,7 @@ def figure_07(paths: Paths, outdir: Path) -> Path:
     )
     axes[1].set_ylabel("Accuracy (%)")
     axes[1].set_xlabel("Station")
-    axes[1].set_title("Figure 7b: Transfer-learning accuracy vs training SNR")
+    srl_title(axes[1], "(b)", "Figure 7b: Transfer-learning accuracy vs training SNR")
     axes[1].legend(ncol=3, fontsize=9)
 
     out = outdir / "Figure07_python.png"
@@ -971,13 +1075,13 @@ def figure_08(paths: Paths, outdir: Path) -> Path:
     fig, axes = plt.subplots(2, 1, figsize=(10, 9), constrained_layout=True)
     _grouped_bar(axes[0], data_train, STATIONS_AVG, ["0.00 s", "0.01 s", "0.02 s"], colors, (70, 105))
     axes[0].set_ylabel("Accuracy (%)")
-    axes[0].set_title("Figure 8a: New model accuracy vs imposed pick-time shift")
+    srl_title(axes[0], "(a)", "Figure 8a: New model accuracy vs imposed pick-time shift")
     axes[0].legend(title="Test-time shift", ncol=3, fontsize=9)
 
     _grouped_bar(axes[1], data_transfer, STATIONS_AVG, ["0.00 s", "0.01 s", "0.02 s"], colors, (70, 103))
     axes[1].set_ylabel("Accuracy (%)")
     axes[1].set_xlabel("Station")
-    axes[1].set_title("Figure 8b: Transfer model accuracy vs imposed pick-time shift")
+    srl_title(axes[1], "(b)", "Figure 8b: Transfer model accuracy vs imposed pick-time shift")
     axes[1].legend(title="Test-time shift", ncol=3, fontsize=9)
 
     out = outdir / "Figure08_python.png"
@@ -1007,7 +1111,7 @@ def figure_09(paths: Paths, outdir: Path) -> Path:
         (75, 102),
     )
     axes[0].set_ylabel("Accuracy (%)")
-    axes[0].set_title("Figure 9a: New model under train/test shift combinations")
+    srl_title(axes[0], "(a)", "Figure 9a: New model under train/test shift combinations")
     axes[0].legend(ncol=2, fontsize=8)
 
     _grouped_bar(
@@ -1020,7 +1124,7 @@ def figure_09(paths: Paths, outdir: Path) -> Path:
     )
     axes[1].set_ylabel("Accuracy (%)")
     axes[1].set_xlabel("Station")
-    axes[1].set_title("Figure 9b: Transfer model under train/test shift combinations")
+    srl_title(axes[1], "(b)", "Figure 9b: Transfer model under train/test shift combinations")
     axes[1].legend(ncol=2, fontsize=8)
     out = outdir / "Figure09_python.png"
     save_figure(fig, out)
@@ -1028,8 +1132,16 @@ def figure_09(paths: Paths, outdir: Path) -> Path:
 
 
 def _build_conflict_data(paths: Paths):
-    wave_path = paths.fm4_root / "02-data" / "Before22OBSs" / "A_All" / "A_wavelarge5.mat"
-    clu_path = paths.fm4_root / "02-data" / "Before22OBSs" / "F_Cl" / "F_Cl_All_MLreplace_samecluster_conf.mat"
+    # Older FM4 layout nests data under 02-data/Before22OBSs/; the current
+    # FM4_7OBS layout has it directly under 02-data/. Support both.
+    wave_path = choose_existing(
+        paths.fm4_root / "02-data" / "Before22OBSs" / "A_All" / "A_wavelarge5.mat",
+        paths.fm4_root / "02-data" / "A_All" / "A_wavelarge5.mat",
+    )
+    clu_path = choose_existing(
+        paths.fm4_root / "02-data" / "Before22OBSs" / "F_Cl" / "F_Cl_All_MLreplace_samecluster_conf.mat",
+        paths.fm4_root / "02-data" / "F_Cl" / "F_Cl_All_MLreplace_samecluster_conf.mat",
+    )
     felix = load_struct_array(wave_path, "Felix")
     po_clu = load_struct_array(clu_path, "Po_Clu")
     id_to_idx = {int(get_value(e, "ID", -1)): i for i, e in enumerate(felix)}
@@ -1094,7 +1206,7 @@ def figure_10(paths: Paths, outdir: Path) -> Path:
         ax.set_title(sta, fontsize=10)
         ax.set_yticks([])
         ax.grid(alpha=0.15)
-    fig.suptitle("Figure 10: Conflicting CC vs ML polarity waveforms by station", fontsize=13)
+    srl_title(fig, None, "Figure 10: Conflicting CC vs ML polarity waveforms by station", method="suptitle", fontsize=13)
     out = outdir / "Figure10_python.png"
     save_figure(fig, out)
     return out
@@ -1130,7 +1242,7 @@ def figure_11(paths: Paths, outdir: Path) -> Path:
             ax.set_xlabel("Longitude")
     axes.ravel()[7].axis("off")
     axes.ravel()[8].axis("off")
-    fig.suptitle("Figure 11: Spatial agreement (gray) vs conflict (blue)", fontsize=13)
+    srl_title(fig, None, "Figure 11: Spatial agreement (gray) vs conflict (blue)", method="suptitle", fontsize=13)
     out = outdir / "Figure11_python.png"
     save_figure(fig, out)
     return out
@@ -1393,7 +1505,7 @@ def figure_12(paths: Paths, outdir: Path) -> Path:
             else:
                 ax.set_xticklabels([])
 
-    fig.suptitle("Figure 12: Focal-mechanism comparison (CC vs AxialPolCap catalogs)", fontsize=13)
+    srl_title(fig, None, "Figure 12: Focal-mechanism comparison (CC vs AxialPolCap catalogs)", method="suptitle", fontsize=13)
     out = outdir / "Figure12_python.png"
     save_figure(fig, out)
     return out
@@ -1559,7 +1671,11 @@ def figure_13(paths: Paths, outdir: Path) -> Path:
     axes[0].grid(alpha=0.2)
     axes[0].set_xlabel("Kagan angle (deg)")
     axes[0].set_ylabel("Count")
-    axes[0].set_title(f"Figure 13a: Histogram (mean={np.mean(kg):.2f}, median={np.median(kg):.2f})")
+    srl_title(
+        axes[0],
+        f"(a) mean={np.mean(kg):.2f}, median={np.median(kg):.2f}",
+        f"Figure 13a: Histogram (mean={np.mean(kg):.2f}, median={np.median(kg):.2f})",
+    )
 
     sc = axes[1].scatter(lon, lat, c=kg, s=7, cmap="jet")
     axes[1].plot(CALDERA_RIM[:, 0], CALDERA_RIM[:, 1], "k-", linewidth=1.5)
@@ -1569,7 +1685,7 @@ def figure_13(paths: Paths, outdir: Path) -> Path:
     axes[1].grid(alpha=0.2)
     axes[1].set_xlabel("Longitude")
     axes[1].set_ylabel("Latitude")
-    axes[1].set_title("Figure 13b: Spatial Kagan distribution")
+    srl_title(axes[1], "(b)", "Figure 13b: Spatial Kagan distribution")
     cb = fig.colorbar(sc, ax=axes[1], shrink=0.75)
     cb.set_label("Kagan (deg)")
 
@@ -1627,7 +1743,7 @@ def figure_14(paths: Paths, outdir: Path) -> Path:
     arr(0.88, 0.57, 0.66, 0.35)
     arr(0.69, 0.32, 0.82, 0.32)
 
-    ax.text(0.02, 0.98, "Figure 14: Real-time focal-mechanism pipeline", fontsize=14, fontweight="bold", va="top")
+    srl_text_title(ax, 0.02, 0.98, None, "Figure 14: Real-time focal-mechanism pipeline", fontsize=14, fontweight="bold", va="top")
 
     out = outdir / "Figure14_python.png"
     save_figure(fig, out)
@@ -1689,7 +1805,22 @@ def main() -> None:
         action="store_true",
         help="If a figure build fails, extract imageN.png from docx as fallback.",
     )
+    parser.add_argument(
+        "--srl",
+        action="store_true",
+        help=(
+            "Export in SRL maintext style: strip descriptive 'Figure N: ...' "
+            "titles (panel letters like (a)/(b) are kept), rescale each "
+            "figure to a real SRL column width, and default --outdir to "
+            "03-output/ instead of 04-manuscripts/python_figures/output/."
+        ),
+    )
     args = parser.parse_args()
+
+    global SRL_MODE
+    SRL_MODE = args.srl
+    if args.srl and args.outdir == str(default_repo / "04-manuscripts" / "python_figures" / "output"):
+        args.outdir = str(default_repo / "03-output")
 
     paths = Paths(
         repo_root=default_repo,

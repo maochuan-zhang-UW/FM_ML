@@ -14,3 +14,11 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .ipynb_checkpoints/
+
+# Large files (>50MB) kept out of git; backed up on COSZO
+/01-scripts/APP/dataset/scsn_p_2000_2017_6sec_0.5r_fm_test.hdf5
+/01-scripts/APP/dataset/scsn_p_2000_2017_6sec_0.5r_pick_test.hdf5
+/01-scripts/APP/dataset/scsn_p_2000_2017_6sec_0.5r_pick_train.hdf5
+/01-scripts/Ross/scsn_p_2000_2017_6sec_0.5r_fm_test.hdf5
+/01-scripts/Ross/scsn_p_2000_2017_6sec_0.5r_fm_train.hdf5
+/01-scripts/Stone_polarPicker/data/Portland_data_polarityInput_newdownload.npy

@@ -1,0 +1,46 @@
+Metadata-Version: 2.4
+Name: eqpolarity
+Version: 0.0.0.3
+Summary: EQpolarity package is a deep-learning-based package for determining earthquake first-motion polarity
+Home-page: https://github.com/chenyk1990/eqpolarity
+Author: eqpolarity developing team
+Author-email: chenyk2016@gmail.com
+License: MIT License
+Keywords: seismology,earthquake seismology,exploration seismology,array seismology,science,engineering,artificial intelligence,deep learning
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: Operating System :: Unix
+Classifier: Operating System :: POSIX
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Topic :: Scientific/Engineering
+Classifier: Topic :: Scientific/Engineering :: Physics
+Classifier: License :: OSI Approved :: GNU General Public License v3 (GPLv3)
+License-File: LICENSE
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: matplotlib==3.8.0
+Requires-Dist: tqdm
+Requires-Dist: obspy
+Requires-Dist: scikit-learn==1.2.2
+Requires-Dist: seaborn==0.13.2
+Provides-Extra: docs
+Requires-Dist: sphinx; extra == "docs"
+Requires-Dist: ipython; extra == "docs"
+Requires-Dist: runipy; extra == "docs"
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: home-page
+Dynamic: keywords
+Dynamic: license
+Dynamic: license-file
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: summary
+
+Source code: https://github.com/chenyk1990/eqpolarity

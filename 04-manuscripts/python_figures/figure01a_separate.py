@@ -88,7 +88,10 @@ CALDERA_RIM = np.array(
 def set_plot_style() -> None:
     plt.rcParams.update(
         {
-            "font.family": "Times New Roman",
+            # Was "Times New Roman" per an earlier one-off request for this
+            # figure; switched to Helvetica for consistency with the SRL
+            # sans-serif requirement applied to all other figures.
+            "font.family": "Helvetica",
             "font.size": 11,
             "axes.titlesize": 13,
             "axes.labelsize": 12,
@@ -300,10 +303,21 @@ def make_figure_1a(repo_root: Path, fm_root: Path, outdir: Path) -> Path:
     set_geo_aspect(ax, lon_lim, lat_lim)
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
-    ax.set_title("Figure 1a: Bathymetry, fissures, and lava flows")
+    if not SRL_MODE:
+        ax.set_title("Figure 1a: Bathymetry, fissures, and lava flows")
     ax.grid(alpha=0.2)
 
     plot_global_inset(fig)
+
+    if SRL_MODE:
+        w, h = fig.get_size_inches()
+        scale = SRL_DOUBLE_COL_IN / w
+        fig.set_size_inches(w * scale, h * scale)
+        # Scale text together with the canvas -- otherwise fixed-point-size
+        # fonts occupy a larger relative fraction of the shrunk image and
+        # collide (this figure has several dense inset labels).
+        for text_obj in fig.findobj(match=lambda o: isinstance(o, plt.Text)):
+            text_obj.set_fontsize(text_obj.get_fontsize() * scale)
 
     outdir.mkdir(parents=True, exist_ok=True)
     out = outdir / "Figure01a_python_updated.png"
@@ -312,13 +326,20 @@ def make_figure_1a(repo_root: Path, fm_root: Path, outdir: Path) -> Path:
     return out
 
 
+SRL_MODE = False
+SRL_DOUBLE_COL_IN = 6.90  # 17.5 cm
+
+
 def main() -> None:
+    global SRL_MODE
     default_repo = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description="Standalone Figure 1a builder")
     parser.add_argument("--repo-root", default=str(default_repo))
     parser.add_argument("--fm-root", default="/Users/mczhang/Documents/GitHub/FM")
     parser.add_argument("--outdir", default=str(default_repo / "04-manuscripts" / "python_figures" / "output"))
+    parser.add_argument("--srl", action="store_true", help="Strip title and rescale to SRL column width")
     args = parser.parse_args()
+    SRL_MODE = args.srl
 
     out = make_figure_1a(Path(args.repo_root), Path(args.fm_root), Path(args.outdir))
     print(f"[OK] Updated Figure 1a saved to: {out}")
