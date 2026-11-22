@@ -184,3 +184,9 @@ this repository because of their size.
 - Skoumal, R. J., Hardebeck, J. L., and Shearer, P. M. (2024). SKHASH: a Python package for computing earthquake focal mechanisms. *SRL*, 95(4), 2519–2526. doi:10.1785/0220230329
 - Wang, K., et al. (2024). Real-time detection of volcanic unrest and eruption at Axial Seamount using machine learning. *SRL*, 95(5), 2651–2662. doi:10.1785/0220240086
 - Zhao, M., et al. (2023). DiTingMotion: a deep-learning first-motion-polarity classifier and its application to focal mechanism inversion. *Frontiers in Earth Science*, 11, 1103914. doi:10.3389/feart.2023.1103914
+
+---
+
+## License
+
+The code and trained models in this repository are released under the [MIT License](LICENSE).
