@@ -96,6 +96,13 @@ C_BENCH = [C_SCRATCH, C_LOSO, C_TRANSFER, C_VAR_1, C_VAR_2]
 
 A_PICK = "red"
 A_NOTE = "blue"
+
+# First-motion polarity colours (Figure 2, review comment: colour-code the
+# traces by polarity).  Up / compressional = red, down / dilatational = blue;
+# traces without a polarity (ambient noise) are neutral grey.
+C_UP = "#c62828"
+C_DOWN = "#1f4fb4"
+C_NOPOL = "0.45"
 A_INK = "k"
 
 SEQ_CMAP = "jet"
@@ -799,6 +806,7 @@ def _plot_stacked_waves(
     offset: float,
     use_po_label: bool,
     half_rate: bool,
+    color: str = "b",
 ) -> None:
     wave_field = f"W_{station}"
     po_field = f"Po_{station}"
@@ -813,7 +821,7 @@ def _plot_stacked_waves(
         w = norm_wave(w)
         x = np.linspace(-0.5, 0.49, w.size)
         yoff = count * offset
-        ax.plot(x, w + yoff, "b-", linewidth=1.0)
+        ax.plot(x, w + yoff, "-", color=color, linewidth=1.0)
         if use_po_label:
             po = get_value(e, po_field, None)
             if po is not None:
@@ -926,8 +934,10 @@ def figure_02_merged(paths: Paths, outdir: Path) -> Path:
         wn = norm_wave(w[::2])
         t = np.linspace(-0.5, 0.49, wn.size)
         yoff = i * offset
-        ax.plot(t, wn + yoff, "b-", linewidth=1.0)
-        ax.text(-0.46, yoff + 0.55, f"Po: {po:+d}", fontsize=7, color="k")
+        c = C_UP if po > 0 else C_DOWN
+        ax.plot(t, wn + yoff, "-", color=c, linewidth=1.0)
+        ax.text(-0.46, yoff + 0.55, f"Po: {po:+d}", fontsize=7, color=c,
+                fontweight="bold")
     ax.set_ylabel("Normalized amplitude")
 
     # ---- (b) noise -------------------------------------------------------
@@ -943,7 +953,7 @@ def figure_02_merged(paths: Paths, outdir: Path) -> Path:
             break
 
     _plot_stacked_waves(axes[1], noise_used, sta, n_plot=n_trace, offset=offset,
-                        use_po_label=False, half_rate=False)
+                        use_po_label=False, half_rate=False, color=C_NOPOL)
     axes[1].set_title("")
     axes[1].set_box_aspect(None)
 
@@ -1001,11 +1011,14 @@ def figure_02_merged(paths: Paths, outdir: Path) -> Path:
         wn = norm_wave(w[::2])
         t = np.linspace(-0.5, 0.49, wn.size)
         yoff = i * offset
-        ax.plot(t, wn + yoff, color="red" if is_base else "black",
-                linewidth=1.4 if is_base else 0.9)
         # Every synthetic trace inherits the polarity of its parent template
-        # in (a); label it the same way (a) does so that stays visible.
-        ax.text(-0.46, yoff + 0.55, f"Po: {base_po:+d}", fontsize=7, color="k")
+        # in (a), so it takes the same polarity colour; the unaugmented
+        # template itself is drawn heavier.
+        c = C_UP if base_po > 0 else C_DOWN
+        ax.plot(t, wn + yoff, "-", color=c,
+                linewidth=1.6 if is_base else 0.9)
+        ax.text(-0.46, yoff + 0.55, f"Po: {base_po:+d}", fontsize=7, color=c,
+                fontweight="bold")
         ticks.append(yoff)
         labels.append(f"{snr_db:.1f} dB")
     ax.yaxis.tick_right()
@@ -1013,7 +1026,9 @@ def figure_02_merged(paths: Paths, outdir: Path) -> Path:
     ax.set_yticklabels(labels, fontsize=7)
     ax.tick_params(axis="y", length=0)
     for lab, is_base in zip(ax.get_yticklabels(), [False] * (len(traces) - 1) + [True]):
-        lab.set_color(A_PICK if is_base else A_NOTE)
+        lab.set_color("k")
+        if is_base:
+            lab.set_fontweight("bold")
 
     for ax in axes:
         ax.set_xlim([-0.5, 0.5])
@@ -1024,6 +1039,14 @@ def figure_02_merged(paths: Paths, outdir: Path) -> Path:
         ax.grid(alpha=0.2)
     for ax in axes[:2]:
         ax.set_yticks([])
+
+    from matplotlib.lines import Line2D
+    fig.legend(
+        [Line2D([], [], color=C_UP, lw=1.6), Line2D([], [], color=C_DOWN, lw=1.6),
+         Line2D([], [], color=C_NOPOL, lw=1.6)],
+        ["Up (Po = +1)", "Down (Po = \u22121)", "Noise (no polarity)"],
+        loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=3, frameon=False,
+        fontsize=8.5)
 
     # Panel labels sit inside the top-left corner of each axes.
     for ax, lab in zip(axes, ("(a)", "(b)", "(c)")):

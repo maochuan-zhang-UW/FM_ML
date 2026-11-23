@@ -18,8 +18,8 @@ pipeline stage.
 
 ## Environment Setup
 
-The conda environment is `tf_macos` (Python 3.11, TensorFlow 2.13.1,
-Keras 2.13.1):
+The conda environment is `tf_macos` (Python 3.10, TensorFlow 2.16.2,
+Keras 3.11.3; `environment.yml` reproduces it as `axialpolcap`):
 
 ```bash
 conda activate tf_macos
