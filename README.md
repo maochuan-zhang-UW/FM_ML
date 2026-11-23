@@ -105,6 +105,15 @@ Load with `keras.models.load_model(path, compile=False)`; polarity probabilities
 `model.predict(X)[1]` (class 0 = negative, 1 = positive), with each 64-sample window
 max-normalized first.
 
+To pick polarities for a new catalogue with the final model:
+
+```bash
+python 01-scripts/application/apply_to_catalog.py --input <catalogue.mat> --output <predictions.mat>
+```
+
+The input holds a struct array `Felix` with 64-sample windows `W_{STA}` centred on the P
+pick. Each `Po_{STA}` is returned as `[catalogue polarity, prediction, confidence, entropy]`.
+
 ---
 
 ## Manuscript figures

@@ -1,6 +1,19 @@
+"""Apply the final AxialPolCap model to a catalogue of 64-sample P windows.
+
+Usage (from the repository root):
+  python 01-scripts/application/apply_to_catalog.py --input <catalogue.mat> \
+      [--model 06-models/AxialPolCap_final.keras] [--output <predictions.mat>] [--start 0]
+
+The input .mat holds a struct array `Felix` with fields W_{STA} (64-sample
+window centred on the P pick) and Po_{STA} (catalogue polarity, -1/+1, 0 if none).
+Each Po_{STA} is written back as [GroundTruth, Prediction, Confidence, Entropy].
+"""
+import argparse
+from pathlib import Path
+
 import numpy as np
 import tensorflow as tf
-tf.config.run_functions_eagerly(True)
+tf.config.set_visible_devices([], "GPU")   # TF-Metal crashes in predict on macOS
 
 from tensorflow import keras
 from scipy.io import loadmat, savemat
@@ -17,17 +30,25 @@ def norm(X):
 # ============================================================
 # LOAD MODEL
 # ============================================================
-model_path = "./06-models/PolarPicker_unified_TS.keras"
-model = keras.models.load_model(model_path)
+ROOT = Path(__file__).resolve().parents[2]
+ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+ap.add_argument("--model", default=str(ROOT / "06-models" / "AxialPolCap_final.keras"))
+ap.add_argument("--input", default=str(ROOT / "02-data" / "A_wave_2015_2022CC.mat"))
+ap.add_argument("--output", default=None)
+ap.add_argument("--start", type=int, default=0, help="index of the first event to process")
+args = ap.parse_args()
+
+model_path = args.model
+model = keras.models.load_model(model_path, compile=False)
 print("✅ Loaded model:", model_path)
 
 # ============================================================
 # LOAD MATLAB DATA
 # ============================================================
-mat_file = "/Users/mcZhang/Documents/GitHub/FM_ML/02-data/A_wave_2015_2022CC.mat"
+mat_file = args.input
 data = loadmat(mat_file, struct_as_record=False, squeeze_me=True)
 Felix = data["Felix"]
-Felix = Felix[14999:]
+Felix = Felix[args.start:]
 
 
 if not isinstance(Felix, np.ndarray):
@@ -153,10 +174,8 @@ else:
 # ============================================================
 # SAVE
 # ============================================================
-output_file = (
-    "/Users/mcZhang/Documents/GitHub/FM_ML/02-data/"
-    "A_wave_2015_2022CC_with_predictions_Final_confidiencev2.mat"
-)
+output_file = args.output or str(
+    Path(mat_file).with_name(Path(mat_file).stem + "_" + Path(model_path).stem + "_predictions.mat"))
 
 savemat(output_file, {"Felix": Felix_new}, format="5", do_compression=True)
 
