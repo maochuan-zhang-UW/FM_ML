@@ -179,6 +179,7 @@ def plot_figure11_2015_2021(
 
     cells_drawn = 0
     cell_counts: List[float] = []
+    cell_ratios: List[float] = []
 
     n_col = 4
     figure, axes = plt.subplots(
@@ -205,6 +206,7 @@ def plot_figure11_2015_2021(
                     cells_drawn += 1
                     cell_counts.append(float(total))
                     ratio = 100.0 * conflict_grid[ix, iy] / total
+                    cell_ratios.append(ratio)
                     x0, x1 = lon_edges[ix], lon_edges[ix + 1]
                     y0, y1 = lat_edges[iy], lat_edges[iy + 1]
                     ax.fill(
@@ -262,6 +264,7 @@ def plot_figure11_2015_2021(
           f"scale capped at {ratio_max:.0f}%")
     if cell_counts:
         arr = np.asarray(cell_counts)
+        print(f"  cells above the {ratio_max:.0f}% cap: {100.0 * np.mean(np.asarray(cell_ratios) > ratio_max):.0f}%")
         print(f"  cells drawn: {cells_drawn} (picks per cell: min {arr.min():.0f}, "
               f"median {np.median(arr):.0f}, max {arr.max():.0f})")
     else:
