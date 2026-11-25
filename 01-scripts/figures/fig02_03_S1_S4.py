@@ -727,110 +727,99 @@ def _build_conflict_data(paths: Paths):
     return conflict_wave, conflict_labels, valid_loc, conflict_loc, conflict_id
 
 
-def figure_10(paths: Paths, outdir: Path) -> Path:
-    """Waveforms where the CC and ML polarity picks disagree.
+def figure_s4(paths: Paths, outdir: Path) -> Path:
+    """Fig. S4: CC/ML polarity disagreements, styled like Fig. 2.
 
-    Redesigned in response to review comment 47 ("font sizes are ridiculously
-    small; what am I meant to be getting out of this figure?"):
-
-      * 2 x 4 panel grid at 7 in printed width instead of a 1 x 7 strip at 19 in,
-        so nothing is scaled down on the page;
-      * the window is trimmed to +/- 0.25 s about the pick, because the polarity
-        decision is made on the first half cycle and the later coda only crowds
-        the panel;
-      * each trace is annotated as "CC / ML" with an explicit up/down symbol
-        rather than the bare "1 -> -1" string.
+    Two panels, each holding ten randomly drawn conflicting waveforms, stacked
+    and aligned on the catalog P pick.  Every station contributes at least one
+    trace to a panel and the three remaining slots are filled at random from the
+    stations that still have unused disagreements; the two panels draw disjoint
+    sets of events.  Each trace is labelled on the right with its station and
+    event ID.  Traces are the 64-sample, 100 Hz catalogue windows classified by
+    AxialPolCap, so the 2015-2021 disagreements of Section 4.1 are shown.
     """
-    conflict_wave, conflict_labels, _, _, _ = _build_conflict_data(paths)
+    conflict_wave, conflict_labels, _, _, conflict_id = _build_conflict_data(paths)
 
-    # Samples: 64-sample catalogue windows at 100 Hz, pick at sample 32.
-    # Keep 0.25 s (25 samples) either side of the pick.
-    pick = 32
-    half = 25
-    n_trace = 6
+    pick, half = 32, 25          # 100 Hz, P pick at sample 32 -> +/- 0.25 s
+    offset = 2.0
+    rng = np.random.default_rng(7)
 
+    sym = {"1": r"$\uparrow$", "-1": r"$\downarrow$"}
     def pretty(label: str) -> str:
         cc_s, ml_s = label.split(" -> ")
-        sym = {"1": r"$\uparrow$", "-1": r"$\downarrow$"}
         return f"CC {sym.get(cc_s.strip(), '?')} / ML {sym.get(ml_s.strip(), '?')}"
 
-    fig, axes = plt.subplots(2, 4, figsize=(FIG_WIDTH_WIDE_IN, 5.0), constrained_layout=True)
-    rng = np.random.default_rng(42)
-    for k, (sta, sta_ax) in enumerate(zip(STATIONS, STATIONS_AX)):
-        ax = axes.ravel()[k]
-        waves = conflict_wave[sta]
-        labels = conflict_labels[sta]
-        if not waves:
-            ax.set_title(f"{sta_ax} (no disagreements)", fontsize=9)
-            ax.axis("off")
-            continue
-        n_plot = min(len(waves), n_trace)
-        picks = rng.choice(len(waves), size=n_plot, replace=False)
-        t = (np.arange(-half, half)) / 100.0
-        for i, idx in enumerate(picks, start=1):
-            w = as_1d(waves[idx])
-            lo, hi = pick - half, pick + half
-            if w.size < hi:
-                continue
-            seg = norm_wave(w[lo:hi])
-            ax.plot(t, 0.42 * seg + i, "k-", linewidth=0.8)
-            ax.text(-0.245, i + 0.30, pretty(labels[idx]), color=A_NOTE, fontsize=6.5,
+    n_per_panel = 10
+
+    # Usable conflicting traces per station, shuffled once up front so that the
+    # two panels consume disjoint events.
+    pools, cursor = {}, {}
+    for sta in STATIONS:
+        idx = [i for i, w in enumerate(conflict_wave[sta])
+               if as_1d(w).size >= pick + half]
+        rng.shuffle(idx)
+        pools[sta], cursor[sta] = idx, 0
+
+    def take(sta: str):
+        """Next unused conflicting trace for this station, or None."""
+        if cursor[sta] >= len(pools[sta]):
+            return None
+        j = pools[sta][cursor[sta]]
+        cursor[sta] += 1
+        return j
+
+    # two independent draws: every station once, then random extras up to ten
+    draws_meta = []
+    for _ in range(2):
+        picked = []
+        for k, (sta, sta_ax) in enumerate(zip(STATIONS, STATIONS_AX)):
+            j = take(sta)
+            if j is not None:
+                picked.append((k, sta, sta_ax, j))
+        while len(picked) < n_per_panel:
+            avail = [(k, sta, sta_ax)
+                     for k, (sta, sta_ax) in enumerate(zip(STATIONS, STATIONS_AX))
+                     if cursor[sta] < len(pools[sta])]
+            if not avail:
+                break
+            k, sta, sta_ax = avail[int(rng.integers(len(avail)))]
+            picked.append((k, sta, sta_ax, take(sta)))
+        picked.sort(key=lambda r: r[0])          # keep the station order on the page
+        draws_meta.append(picked)
+
+    draws = [[(sta_ax, conflict_id[sta][j], as_1d(conflict_wave[sta][j]),
+               conflict_labels[sta][j])
+              for _, sta, sta_ax, j in picked]
+             for picked in draws_meta]
+
+    fig, axes = plt.subplots(1, 2, figsize=(FIG_WIDTH_IN, 7.2), constrained_layout=True)
+    t = np.arange(-half, half) / 100.0
+    for ax, picked in zip(axes, draws):
+        ticks, labels = [], []
+        for i, (sta_ax, eid, w, lab) in enumerate(picked):
+            seg = norm_wave(w[pick - half:pick + half])
+            yoff = i * offset
+            ax.plot(t, seg + yoff, "b-", linewidth=1.0)
+            ax.text(-0.243, yoff + 0.62, pretty(lab), color=A_NOTE, fontsize=7,
                     va="center", ha="left")
+            ticks.append(yoff)
+            labels.append(f"{sta_ax}  {eid}")
         ax.axvline(0.0, color=A_PICK, linestyle="--", linewidth=0.9)
+        ax.yaxis.tick_right()
+        ax.set_yticks(ticks)
+        ax.set_yticklabels(labels, fontsize=7)
+        ax.tick_params(axis="y", length=0)
         ax.set_xlim([-0.25, 0.25])
-        ax.set_ylim([0.3, n_plot + 0.9])
-        ax.set_title(sta_ax, fontsize=9, pad=3)
-        ax.set_yticks([])
-        ax.set_xticks([-0.2, 0.0, 0.2])
-        ax.tick_params(labelsize=8)
-        ax.grid(axis="x", alpha=0.15, linewidth=0.5)
-        if k >= 4:
-            ax.set_xlabel("Time from P pick (s)", fontsize=8.5)
+        ax.set_ylim([-offset, len(picked) * offset])
+        ax.set_xlabel("Time from P pick (s)")
+        ax.grid(alpha=0.2)
 
-    # Legend panel in the unused 8th cell.
-    lax = axes.ravel()[7]
-    lax.axis("off")
-    lax.plot([], [], "k-", linewidth=0.8, label="Vertical-component waveform")
-    lax.axvline(np.nan, color=A_PICK, linestyle="--", linewidth=0.9)
-    lax.plot([], [], color=A_PICK, linestyle="--", linewidth=0.9, label="Catalog P pick")
-    lax.legend(loc="center", fontsize=7.5, frameon=False)
-    lax.text(0.5, 0.30, "Labels give the polarity assigned\nby cross-correlation (CC) and by\nAxialPolCap (ML) for the same trace.",
-             transform=lax.transAxes, ha="center", va="top", fontsize=7, color=A_NOTE)
+    for ax, lab in zip(axes, ("(a)", "(b)")):
+        panel_label(ax, lab)
 
-    fig.suptitle("")
-    out = outdir / "Figure10_python.png"
+    out = outdir / "FigureS4_python.png"
     save_figure(fig, out)
     return out
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -895,7 +884,7 @@ class Paths:
 
 
 FIGURES = {"2": (figure_02_merged, "GJI_Figure02.png"), "3": (figure_04, "GJI_Figure03.png"),
-           "S1": (figure_s_confusion, "GJI_FigureS1.png"), "S4": (figure_10, "GJI_FigureS4.png")}
+           "S1": (figure_s_confusion, "GJI_FigureS1.png"), "S4": (figure_s4, "GJI_FigureS4.png")}
 
 
 def main() -> None:
