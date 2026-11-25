@@ -48,3 +48,4 @@ path,bytes,sha256,used_for
 07-files/axial_calderaRim.m,1387,e197f51f30b9316183abb1df03270d578e728b7766c8b50c4f1e48b1ec1dc2d0,"Figs 1, 8: map data"
 07-files/coastlines_ne110m.txt,88385,98bb0150cb5217e629d62f87c38897d4a1fbf46ba214ff17c86313111c12e8b6,"Figs 1, 8: map data"
 07-files/evMw.txt,6778875,b4c4aa6d12ef5419b02b68b265d03756748e7125695ff7a2fe6d5922570fc0f2,Fig. 1c: magnitudes
+02-data/raw/benchmark/A_wave_dB15_DT_CFM_EQP_PolCAP.mat,59254184,97b4b5c2efcfc8809c7c59249e93aa0bf8672ed07e167bba63a2eb80e217b9dc,"Fig. 3, Fig. S1, Table S2: benchmark predictions of four published models"

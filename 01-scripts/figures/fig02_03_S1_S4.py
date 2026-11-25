@@ -557,12 +557,34 @@ def _grouped_bar(ax: plt.Axes, data: np.ndarray, labels: Sequence[str], series: 
 # DiTingMotion is evaluated on fewer waveforms than the other three because it
 # returns no prediction for part of the set.
 # ---------------------------------------------------------------------------
-CM_COUNTS = {
-    "DiTingMotion": [[5685, 723], [742, 1179]],
-    "CFM": [[8609, 1032], [939, 6548]],
-    "EQPolarity": [[8648, 993], [1091, 6396]],
-    "PolarCAP": [[8633, 1008], [1066, 6421]],
-}
+# Benchmark results from 01-scripts/benchmark/score_benchmark.py (zero-shot
+# predictions of the four published models on the Axial benchmark set).
+BENCH_CSV = Path(__file__).resolve().parents[2] / "03-figs" / "benchmark_confusion_matrix.csv"
+BENCH_MODELS = ["DiTingMotion", "CFM", "EQPolarity", "PolarCAP"]
+# Cross-correlation accuracy per station on the benchmark templates
+# (H_compare_Man_CC.m in the benchmark bundle); its inputs are not in the data archive.
+CC_ACCURACY = np.array([0.99972, 0.95991, 0.99134, 0.93391, 0.84833, 0.87012, 0.80463]) * 100
+
+
+def _half_up(x: float) -> float:
+    from decimal import Decimal, ROUND_HALF_UP
+    return float(Decimal(str(x)).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP))
+
+
+def _load_benchmark():
+    import csv
+    rows = list(csv.DictReader(open(BENCH_CSV)))
+    acc, cm = {}, {}
+    for m in BENCH_MODELS:
+        acc[m] = np.array([_half_up(float(r["Accuracy(%)"])) for s in STATIONS for r in rows
+                           if r["Model"] == m and r["Station"] == s])
+        r = next(r for r in rows if r["Model"] == m and r["Station"] == "ALL (pooled)")
+        # rows = actual Up/Down, columns = predicted Up/Down
+        cm[m] = [[int(r["PT"]), int(r["NF"])], [int(r["PF"]), int(r["NT"])]]
+    return acc, cm
+
+
+BENCH_ACC, CM_COUNTS = _load_benchmark()
 
 
 def figure_s_confusion(paths: Paths, outdir: Path) -> Path:
@@ -612,11 +634,8 @@ def figure_04(paths: Paths, outdir: Path) -> Path:
     colors = C_BENCH
     # DiTingMotion, EQPolarity and PolarCAP re-run 2026-09-18; CFM and the
     # cross-correlation baseline are unchanged and keep their original values.
-    diting = np.array([94.1, 70.9, 85.8, 76.2, 81.6, 66.2, 84.8])
-    cfm = np.array([97.0, 81.0, 97.4, 88.3, 87.1, 82.9, 74.5])
-    eqp = np.array([96.5, 79.4, 96.8, 87.1, 86.0, 83.3, 75.4])
-    polcap = np.array([96.1, 79.8, 97.3, 87.8, 86.4, 81.9, 75.4])
-    cc = np.array([0.99972, 0.95991, 0.99134, 0.93391, 0.84833, 0.87012, 0.80463]) * 100
+    diting, cfm, eqp, polcap = (BENCH_ACC[m] for m in BENCH_MODELS)
+    cc = CC_ACCURACY
     # The Average bar is the pooled accuracy over all waveforms, not the
     # unweighted mean of the seven station accuracies: it is the value the
     # confusion matrices of Figure S1 report, and it weights each station by how
@@ -824,11 +843,8 @@ def write_benchmark_table(outdir: Path) -> Path:
     """
     # DiTingMotion, EQPolarity and PolarCAP re-run 2026-09-18; CFM and the
     # cross-correlation baseline are unchanged and keep their original values.
-    diting = np.array([94.1, 70.9, 85.8, 76.2, 81.6, 66.2, 84.8])
-    cfm = np.array([97.0, 81.0, 97.4, 88.3, 87.1, 82.9, 74.5])
-    eqp = np.array([96.5, 79.4, 96.8, 87.1, 86.0, 83.3, 75.4])
-    polcap = np.array([96.1, 79.8, 97.3, 87.8, 86.4, 81.9, 75.4])
-    cc = np.array([0.99972, 0.95991, 0.99134, 0.93391, 0.84833, 0.87012, 0.80463]) * 100
+    diting, cfm, eqp, polcap = (BENCH_ACC[m] for m in BENCH_MODELS)
+    cc = CC_ACCURACY
 
     methods = [
         ("DiTingMotion", diting),
