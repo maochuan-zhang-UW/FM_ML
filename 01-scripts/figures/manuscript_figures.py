@@ -1485,16 +1485,13 @@ def figure_09(paths: Paths, outdir: Path) -> Path:
 
 
 def _build_conflict_data(paths: Paths):
-    wave_path = choose_existing(
-        paths.fm4_root / "02-data" / "Before22OBSs" / "A_All" / "A_wavelarge5.mat",
-        paths.repo_root / "02-data" / "A_wavelarge5.mat",
-    )
-    clu_path = choose_existing(
-        paths.fm4_root / "02-data" / "Before22OBSs" / "F_Cl" / "F_Cl_All_MLreplace_samecluster_conf.mat",
-        paths.repo_root / "02-data" / "F_Cl_All_MLreplace_samecluster_conf.mat",
-    )
-    felix = load_struct_array(wave_path, "Felix")
-    po_clu = load_struct_array(clu_path, "Po_Clu")
+    # 2015-2021 catalogue windows and AxialPolCap predictions (05_apply_to_catalog.py):
+    # W_{STA} = 64-sample window at 100 Hz, P pick at sample 32;
+    # Po_{STA} = [CC, ML, confidence, entropy]. A disagreement is a pick with
+    # confidence >= 0.95 whose ML polarity differs from CC (Section 4.1).
+    clu_path = paths.repo_root / "02-data" / "A_wave_2015_2021_AxialPolCap_final_conf80_predictions.mat"
+    po_clu = load_struct_array(clu_path, "Felix")
+    felix = po_clu
     id_to_idx = {int(get_value(e, "ID", -1)): i for i, e in enumerate(felix)}
 
     po_fields = [f"Po_{s}" for s in STATIONS]
@@ -1519,10 +1516,10 @@ def _build_conflict_data(paths: Paths):
             if val is None:
                 continue
             val = as_1d(val)
-            if val.size < 2:
+            if val.size < 3:
                 continue
             p1, p2 = float(val[0]), float(val[1])  # CC, ML
-            if p1 == 0 or p2 == 0:
+            if p1 == 0 or p2 == 0 or float(val[2]) < 0.95:
                 continue
             valid_loc[sta].append((lon, lat))
             if p1 != p2:
@@ -1551,10 +1548,10 @@ def figure_10(paths: Paths, outdir: Path) -> Path:
     """
     conflict_wave, conflict_labels, _, _, _ = _build_conflict_data(paths)
 
-    # Samples: the waveforms are 200 Hz, pick at sample 50 in the 100-sample view
-    # used previously.  Keep 0.25 s (50 samples) either side of the pick.
-    pick = 50
-    half = 50
+    # Samples: 64-sample catalogue windows at 100 Hz, pick at sample 32.
+    # Keep 0.25 s (25 samples) either side of the pick.
+    pick = 32
+    half = 25
     n_trace = 6
 
     def pretty(label: str) -> str:
@@ -1574,7 +1571,7 @@ def figure_10(paths: Paths, outdir: Path) -> Path:
             continue
         n_plot = min(len(waves), n_trace)
         picks = rng.choice(len(waves), size=n_plot, replace=False)
-        t = (np.arange(-half, half)) / 200.0
+        t = (np.arange(-half, half)) / 100.0
         for i, idx in enumerate(picks, start=1):
             w = as_1d(waves[idx])
             lo, hi = pick - half, pick + half
@@ -2405,7 +2402,7 @@ def parse_figure_ids(figures: str) -> List[int]:
 
 
 def main() -> None:
-    default_repo = Path(__file__).resolve().parents[1]
+    default_repo = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser(description="Generate manuscript figures in Python")
     parser.add_argument("--figures", default="all", help="Comma list (e.g., 1,2,10) or 'all'")
     parser.add_argument(

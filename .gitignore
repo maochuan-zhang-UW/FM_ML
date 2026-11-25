@@ -44,3 +44,7 @@ __pycache__/
 # Superseded learning-curve runs and draft figure folders
 06-models/history/
 03-figs/draft_optionB/
+
+# Pretrained PolarCAP weights (Chakraborty et al. 2022) are not redistributed
+06-models/PolarCAP.h5
+06-models/checks/*.keras

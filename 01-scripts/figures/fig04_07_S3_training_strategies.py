@@ -1,8 +1,8 @@
 """GJI Figs 4-7 and S3: training strategies, SNR, and time-shift experiments.
 
 Reads the per-run JSON results written by
-01-scripts/training/retrain_fig4_strategies.py into 06-models/retrain_20261122/
-(see 01-scripts/training/run_training_strategies.sh for the full set of runs).
+01-scripts/04_train.py into 06-models/retrain_20261122/
+(see 01-scripts/04_run_all_training.sh for the full set of runs).
 
 Transfer-learning model in Figs 4-7: PolarCAP with its pretrained softmax
 classifier frozen and the encoder retrained ("freezecls").
@@ -29,7 +29,7 @@ RUNS = ROOT / "06-models" / "retrain_20261122"
 OUT = ROOT / "03-figs"
 ST = ["AS1", "AS2", "CC1", "EC1", "EC2", "EC3", "ID1"]
 
-spec = importlib.util.spec_from_file_location("mmf", ROOT / "01-scripts" / "make_manuscript_figures.py")
+spec = importlib.util.spec_from_file_location("mmf", ROOT / "01-scripts" / "figures" / "manuscript_figures.py")
 h = importlib.util.module_from_spec(spec)
 sys.modules["mmf"] = h
 spec.loader.exec_module(h)

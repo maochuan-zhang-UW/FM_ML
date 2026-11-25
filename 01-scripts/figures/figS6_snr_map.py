@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Spatial variation of P-wave signal-to-noise ratio across the Axial network.
+"""Fig. S6: spatial variation of P-wave signal-to-noise ratio across the Axial network.
 
 Companion to Figure S4: the same 200 m grid, the same per-cell minimum and the
 same panel layout, but coloured by the median SNR of the picks in each cell
@@ -7,16 +7,15 @@ rather than by the AxialPolCap-CC disagreement rate.  Plotting the two on the
 same cells lets the reader judge directly whether the spatial pattern of
 disagreement follows the spatial pattern of SNR.
 
-SNR values and event locations are taken from fig01_panelCD_data.mat, the same
-per-station-event measurements plotted in Figure 1d, so the two figures cannot
-disagree.  By default the cells are restricted to the picks actually compared in
+SNR values are computed from the catalogue windows exactly as in Figure 1d
+(fig01_background.py), so the two figures cannot disagree.  By default the cells are restricted to the picks actually compared in
 Section 4.1: template station-event pairs are dropped, and a pick is kept only
 when AxialPolCap returns a class probability of at least CONF_MIN and the
 cross-correlation method also returns a polarity.
 
-    python 01-scripts/plot_figureS5_snr_map.py \
+    python 01-scripts/figures/figS6_snr_map.py \
         --grid-m 200 --min-per-cell 150 \
-        --output 03-figs/SRL_FigureS5_snr.png
+        --output 03-figs/GJI_FigureS6.png
 """
 from __future__ import annotations
 
@@ -37,10 +36,11 @@ from matplotlib.colors import Normalize
 from matplotlib.ticker import FormatStrFormatter
 from scipy.io import loadmat
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-SNR_MAT = REPO_ROOT / "02-data" / "fig01_panelCD_data.mat"
-PRED_MAT = REPO_ROOT / "02-data" / "A_wave_2015_2021_h5_conf80_predictions.mat"
-OUTPUT = REPO_ROOT / "03-figs" / "SRL_FigureS5_snr.png"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+TEMPLATE_MAT = REPO_ROOT / "02-data" / "A_wave_dB20_cleaned.mat"
+NOISE_END = 20
+PRED_MAT = REPO_ROOT / "02-data" / "A_wave_2015_2021_AxialPolCap_final_conf80_predictions.mat"
+OUTPUT = REPO_ROOT / "03-figs" / "GJI_FigureS6.png"
 
 STATIONS = ["AS1", "AS2", "CC1", "EC1", "EC2", "EC3", "ID1"]
 GRID_SIZE_M = 200.0
@@ -52,7 +52,7 @@ LAT_LIM = [45.92, 45.972]
 
 def fig_helpers():
     spec = importlib.util.spec_from_file_location(
-        "mmf", REPO_ROOT / "01-scripts" / "make_manuscript_figures.py"
+        "mmf", REPO_ROOT / "01-scripts" / "figures" / "manuscript_figures.py"
     )
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod
@@ -61,19 +61,27 @@ def fig_helpers():
 
 
 def load_snr():
-    """Per station-event SNR joined to the event location."""
-    m = loadmat(str(SNR_MAT), struct_as_record=False, squeeze_me=True)
-    ev_id = np.asarray(m["evID"], dtype=np.int64)
-    lon = dict(zip(ev_id.tolist(), np.asarray(m["evLon"], float).tolist()))
-    lat = dict(zip(ev_id.tolist(), np.asarray(m["evLat"], float).tolist()))
-    return (
-        np.asarray(m["snrDb"], float),
-        np.asarray(m["snrEventID"], dtype=np.int64),
-        np.asarray(m["snrStation"], int),
-        np.asarray(m["snrIsTemplate"], int),
-        lon,
-        lat,
-    )
+    """Per station-event SNR joined to the event location.
+
+    SNR = 20 log10 of the peak absolute amplitude after / before sample
+    NOISE_END of the 64-sample catalogue window, as in Fig. 1d
+    (fig01_background.py). Template flags are per event, as in Fig. 1.
+    """
+    felix = np.atleast_1d(loadmat(str(PRED_MAT), struct_as_record=False, squeeze_me=True)["Felix"])
+    tmpl = {int(e.ID) for e in np.atleast_1d(
+        loadmat(str(TEMPLATE_MAT), struct_as_record=False, squeeze_me=True)["Felix"])}
+    snr, ev, sta, ist, lon, lat = [], [], [], [], {}, {}
+    for e in felix:
+        eid = int(e.ID)
+        lon[eid], lat[eid] = float(e.lon), float(e.lat)
+        for i, s in enumerate(STATIONS):
+            w = np.abs(np.asarray(getattr(e, f"W_{s}", []), float).ravel())
+            if w.size <= NOISE_END:
+                continue
+            nz, sg = w[:NOISE_END].max(), w[NOISE_END:].max()
+            if nz > 0 and np.isfinite(sg):
+                snr.append(20 * np.log10(sg / nz)); ev.append(eid); sta.append(i + 1); ist.append(eid in tmpl)
+    return (np.array(snr), np.array(ev, np.int64), np.array(sta), np.array(ist, int), lon, lat)
 
 
 def load_compared_pairs():

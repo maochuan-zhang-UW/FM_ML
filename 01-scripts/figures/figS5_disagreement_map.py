@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Plot Figure 11-style polarity conflict maps for the 2015-2021 catalog.
+"""Fig. S5: spatial disagreement between AxialPolCap and CC polarities, 2015-2021.
 
 The cell size, the per-cell pick minimum and the colour-scale cap are all
 command-line options, because the main-text and supplementary versions of this
@@ -7,7 +7,7 @@ map use different settings.  The defaults reproduce the compact main-text
 figure (50 m cells, 50 picks minimum, scale to 50%).  Supplementary Figure S4
 uses 200 m cells, a 150-pick minimum and a 30% scale cap:
 
-    python 01-scripts/plot_figure11_2015_2021.py \
+    python 01-scripts/figures/figS5_disagreement_map.py \
         --grid-m 200 --min-per-cell 150 --ratio-max 30 --exclude-templates \
         --output 03-figs/SRL_FigureS4.png
 """
@@ -34,16 +34,16 @@ from matplotlib.ticker import FormatStrFormatter
 # legible at printed size).
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_INPUT = REPO_ROOT / "02-data" / "A_wave_2015_2021_h5_conf80_predictions.mat"
-DEFAULT_OUTPUT = REPO_ROOT / "03-figs" / "Figure11_2015_2021_h5_conf80_compact_python.png"
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_INPUT = REPO_ROOT / "02-data" / "A_wave_2015_2021_AxialPolCap_final_conf80_predictions.mat"
+DEFAULT_OUTPUT = REPO_ROOT / "03-figs" / "GJI_FigureS5.png"
 # Defaults for the compact main-text figure.  Cell size and the per-cell
 # minimum trade against each other: halving the cell quarters the picks it
 # holds, so a finer grid shows more detail but drops more cells below the
 # minimum.  Override all three on the command line (see the module docstring).
-GRID_SIZE_M = 50.0
-MIN_EVENTS_PER_GRID = 50
-RATIO_MAX_DEFAULT = 50.0     # colour-scale cap, per cent disagreement
+GRID_SIZE_M = 200.0
+MIN_EVENTS_PER_GRID = 150
+RATIO_MAX_DEFAULT = 30.0     # colour-scale cap, per cent disagreement
 CONF_MIN = 0.95              # class-probability threshold used in Section 4.1
 # Station-event pairs used as training templates.  Section 4.1 excludes them from
 # the CC/ML comparison so the reported agreement is measured only on picks the
@@ -52,7 +52,7 @@ TEMPLATE_H5 = REPO_ROOT / "02-data" / "A_wave_dB20_cleaned.h5"
 
 
 def load_figure_helpers():
-    source = REPO_ROOT / "01-scripts" / "make_manuscript_figures.py"
+    source = REPO_ROOT / "01-scripts" / "figures" / "manuscript_figures.py"
     spec = importlib.util.spec_from_file_location("make_manuscript_figures", source)
     if spec is None or spec.loader is None:
         raise ImportError(f"Cannot load helpers from {source}")

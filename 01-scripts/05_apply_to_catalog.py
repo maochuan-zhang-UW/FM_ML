@@ -1,5 +1,21 @@
 #!/usr/bin/env python3
-"""Apply PolarPicker_h5_20260308_154910 to the 2015-2021 Axial catalog."""
+"""Step 5: apply AxialPolCap to the catalogue waveforms (Section 4.1).
+
+Each catalogue event holds 64-sample vertical-component windows W_{STA}
+centred on the P pick (3-20 Hz causal bandpass, 100 Hz) and the CC polarity
+Po_{STA}. Every window is max-normalized and classified; Po_{STA} is then
+written back as
+
+  [CC polarity, AxialPolCap polarity (0 if confidence < threshold), confidence, entropy]
+
+with confidence = maximum class probability and entropy = -sum(p log p).
+
+Usage (from the repository root):
+  python 01-scripts/05_apply_to_catalog.py \
+      [--model 06-models/AxialPolCap_final.keras] \
+      [--input 02-data/raw/A_wave_2015_2022CC.mat] \
+      [--output 02-data/A_wave_2015_2021_AxialPolCap_final_conf80_predictions.mat]
+"""
 
 from __future__ import annotations
 
@@ -10,19 +26,16 @@ from pathlib import Path
 import numpy as np
 from scipy.io import loadmat, savemat
 
-os.environ.setdefault("MPLCONFIGDIR", "/tmp/mplconfig_fm5_ml")
 os.environ.setdefault("TF_FORCE_GPU_ALLOW_GROWTH", "true")
 
 import tensorflow as tf
 from tensorflow import keras
 
 
-ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_MODEL = ROOT / "06-models" / "PolarPicker_h5_20260308_154910.keras"
-DEFAULT_INPUT = Path(
-    "/Users/mcZhang/Documents/GitHub/FM_ML_bk/02-data/A_wave_2015_2022CC.mat"
-)
-DEFAULT_OUTPUT = ROOT / "02-data" / "A_wave_2015_2021_h5_conf80_predictions.mat"
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_MODEL = ROOT / "06-models" / "AxialPolCap_final.keras"
+DEFAULT_INPUT = ROOT / "02-data" / "raw" / "A_wave_2015_2022CC.mat"
+DEFAULT_OUTPUT = ROOT / "02-data" / "A_wave_2015_2021_AxialPolCap_final_conf80_predictions.mat"
 STATIONS = ["AS1", "AS2", "CC1", "EC1", "EC2", "EC3", "ID1"]
 
 

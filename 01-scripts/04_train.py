@@ -1,5 +1,5 @@
-"""Retrain the four training strategies with one consistent protocol and
-evaluate each per station on the common test sets used by Figs 4-6.
+"""Step 4: train one model with one of the four training strategies and
+evaluate it per station on the common test sets (Figs 4-7, S3).
 
 Strategies
   scratch   : AxialPolCap architecture, random init, MSE + Huber(0.5) loss 1:200
@@ -19,7 +19,7 @@ Evaluation sets (per station, no split prefix)
   TMSF_Val     : sigma = 0.02 s time-shifted test set (Fig. 6)
 
 Usage (from FM_ML/):
-  python 01-scripts/training/retrain_fig4_strategies.py <strategy> <data_dir_name> [seed] [holdout]
+  python 01-scripts/04_train.py <strategy> <data_dir_name> [seed] [holdout]
   e.g. ... scratch TMSF_Tra_000
        ... scratch TMSF_Tra_000 0 ID1    (LOSO: train on the other six stations)
 """
@@ -35,14 +35,13 @@ from tensorflow.keras import layers, Model, Sequential
 strategy, data_name = sys.argv[1], sys.argv[2]
 seed = int(sys.argv[3]) if len(sys.argv) > 3 else 0
 holdout = sys.argv[4] if len(sys.argv) > 4 else None   # LOSO: station left out
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TRA = f"{ROOT}/02-data/K_aug/{data_name}"
-# Test sets (Val, TMSF_Val_001, TMSF_Val) built by
-# data_preparation/augmentation/{L_saveNPY_Validate.m, L2_saveNPY_val.py, L3_saveNPY_TMSF_00[12]_val.py}
-EVAL_ROOT = os.environ.get("AXIAL_EVAL_ROOT", f"{ROOT}/01-scripts/FM_ML_bk/02-data/K_aug")
+# Test sets (Val, TMSF_Val_001, TMSF_Val) built by 03_build_datasets.py --mode test
+EVAL_ROOT = os.environ.get("AXIAL_EVAL_ROOT", f"{ROOT}/02-data/K_aug")
 EVAL_SETS = ["Val", "TMSF_Val_001", "TMSF_Val"]
 # Pretrained PolarCAP weights (Chakraborty et al. 2022), not redistributed here
-PCAP = os.environ.get("POLARCAP_H5", f"{ROOT}/01-scripts/FM_ML_bk/06-models/PolarCAP.h5")
+PCAP = os.environ.get("POLARCAP_H5", f"{ROOT}/06-models/PolarCAP.h5")
 OUT = f"{ROOT}/06-models/retrain_20261122"
 os.makedirs(OUT, exist_ok=True)
 tag = f"{data_name}_{strategy}_s{seed}" + (f"_loso{holdout}" if holdout else "")
