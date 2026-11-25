@@ -8,7 +8,7 @@ reported per station, for events with >= 5 retained picks (the composite
 mechanism criterion) and for events retained at all seven stations.
 
 Input: output of 05_apply_to_catalog.py; templates (event_id per station) in
-02-data/A_wave_dB20_cleaned.h5.
+02-data/raw/A_wave_dB20_cleaned.h5.
 Usage (from the repository root): python 01-scripts/06_compare_with_cc.py
 """
 import argparse
@@ -26,7 +26,7 @@ STATIONS = ["AS1", "AS2", "CC1", "EC1", "EC2", "EC3", "ID1"]
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--predictions", default=str(ROOT / "02-data" / "A_wave_2015_2021_AxialPolCap_final_conf80_predictions.mat"))
-    ap.add_argument("--templates", default=str(ROOT / "02-data" / "A_wave_dB20_cleaned.h5"))
+    ap.add_argument("--templates", default=str(ROOT / "02-data" / "raw" / "A_wave_dB20_cleaned.h5"))
     ap.add_argument("--conf", type=float, default=0.95)
     ap.add_argument("--out", default=str(ROOT / "02-data" / "section41_agreement.json"))
     a = ap.parse_args()

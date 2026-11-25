@@ -29,7 +29,7 @@ RUNS = ROOT / "06-models" / "retrain_20261122"
 OUT = ROOT / "03-figs"
 ST = ["AS1", "AS2", "CC1", "EC1", "EC2", "EC3", "ID1"]
 
-spec = importlib.util.spec_from_file_location("mmf", ROOT / "01-scripts" / "figures" / "manuscript_figures.py")
+spec = importlib.util.spec_from_file_location("mmf", ROOT / "01-scripts" / "figures" / "fig02_03_S1_S4.py")
 h = importlib.util.module_from_spec(spec)
 sys.modules["mmf"] = h
 spec.loader.exec_module(h)

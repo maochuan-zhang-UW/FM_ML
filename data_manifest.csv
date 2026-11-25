@@ -1,0 +1,50 @@
+path,bytes,sha256,used_for
+02-data/raw/Template_divide.mat,13353716,4bdc84496d767488ffa9a65ccc81e2f87eafd03f5c197d45ae46fe413df33252,"step 1: template waveforms, training (80%) and test (20%) split"
+02-data/raw/H_Noise_200.mat,511281040,d6f00105cd3323a84ab4db8c19f62c2e3d42b411a773b48aae41ba6285c8e0d0,step 1: seafloor noise library
+02-data/raw/H_noise_dB20_snrValue.mat,2358811,1bed9cb00a64dfcebbbf0b4931bedf3901a6606797172e54cbb03a6a531b8328,step 1: observed SNR of catalogue picks; Fig. 2
+02-data/raw/A_wave_2015_2022CC.mat,180812343,6dc034a2f99ba1fdcdfa1f5dc4bb5ed8e87c838c3e46289483ea1b1367894d77,step 5: 2015-2021 catalogue windows and CC polarities
+02-data/raw/A_wave_dB20_cleaned.mat,5984443,91059ba2eb9f8f530f23aa3ea53b762963df005e22d5bebfe4cb89e4382df640,"Figs 1, 2, S6: template events"
+02-data/raw/A_wave_dB20_cleaned.h5,2651922,f8a08c9087bbceb6e4396d583758b5bc06840b6d3200d014a4390d1519b24b3a,"step 6, Fig. S5: template events per station"
+02-data/raw/A_wave_noise_10000.mat,53271960,f9d7d2b028a673fa8fe7fd3b5efb1fcdf16095301ee78eb42438291a28f6fb84,Fig. 2: noise examples
+02-data/raw/F_2015Erp_V1V2V3_Po_polished.mat,311692077,29b3fdd925c900228e37a786e5b6f19fd17c3270af616b3aa34f75501843df06,"step 7: CC clusters, CC polarities, S/P amplitudes"
+02-data/raw/TakeOffAzimuth0203_ext2026.mat,3847394,6ddd4dc8e1781b1174edfe8d0c7453473fa99c95b00a8519871ddb7d28e460a7,step 7: station coordinates and 1-D Vp model
+02-data/raw/Felix_kmean_morethan5.mat,16238297,f130678f7f59d0c4d7512e97b1f55fbb9957d23ba36f198acdb5b22a7c2aac93,Fig. 1: catalogue earthquakes with >= 5 P and S picks
+02-data/raw/ColormapZMC.mat,3216,62e167eb70e6fdde20cad5acd2c56d6f84fe8fd97fc3f691c77c21c09e9c7307,Fig. 1: bathymetry colour map
+02-data/archive/Org/AS1_T_add.mat,24171717,6a7168d4d46f0dea17563dc59a054cec69ba105ff80faab545cb6685ce7bd5f3,"archived augmentation, original SNR (paper datasets)"
+02-data/archive/Org/AS2_T_add.mat,23947539,a8444ab2fbf1b6490f5d8e656c1c231329ef4389bd08c689f476a19e44024fce,"archived augmentation, original SNR (paper datasets)"
+02-data/archive/Org/CC1_T_add.mat,24269665,45192e508fd49a525fee33ac00762ea5f887f157521a918e502a40af4eb2b625,"archived augmentation, original SNR (paper datasets)"
+02-data/archive/Org/EC1_T_add.mat,25008522,2a0f4de37ce16084ad30c638f83e8823035c9d9a0fa816674860e844079f1592,"archived augmentation, original SNR (paper datasets)"
+02-data/archive/Org/EC2_T_add.mat,24558348,a6bca316b32363b0cbe11274c3435190c448cc24724ceefdc6d86c87c2d2387a,"archived augmentation, original SNR (paper datasets)"
+02-data/archive/Org/EC3_T_add.mat,24000203,cff075a5422fb921690a4a2349aba20433892ddbf6cfb2446c6a499032fa6b84,"archived augmentation, original SNR (paper datasets)"
+02-data/archive/Org/ID1_T_add.mat,24103939,a4c7313d0c04fb257b751adb14f6e04588a328e5a86b5a1c14c37a78044254c0,"archived augmentation, original SNR (paper datasets)"
+02-data/archive/STEP/AS1_T_add_ST.mat,24174918,70728092971186dae1e2f478a0ed6cb2b3952b118a055f1ba254c2c817d82a01,"archived augmentation, 10-30 dB"
+02-data/archive/STEP/AS2_T_add_ST.mat,23950360,a6dcb30d433d7ebdde37545557b28cf099b8b49be6882f4bd535a434dca62415,"archived augmentation, 10-30 dB"
+02-data/archive/STEP/CC1_T_add_ST.mat,24272175,e254090e1a3c62093691e752ac58d0ad20d693cd4b391f6d0f2fc7296a4e5d6e,"archived augmentation, 10-30 dB"
+02-data/archive/STEP/EC1_T_add_ST.mat,25009313,d90751dfb36b6007ccf27dda4e7115cc43d54e57ef16623a22562762564c7a89,"archived augmentation, 10-30 dB"
+02-data/archive/STEP/EC2_T_add_ST.mat,24560252,9e9a204f97afee292b26fe705986a2438082946ebe3a3055bdb9fe4194d9f592,"archived augmentation, 10-30 dB"
+02-data/archive/STEP/EC3_T_add_ST.mat,24002616,0d3f5f5a663b6acc27bd160ee51264b72e7aef2ef622f6ebb65eae3eddc559f0,"archived augmentation, 10-30 dB"
+02-data/archive/STEP/ID1_T_add_ST.mat,24106309,d2804a3d22b61f288e6bf40ebff9d1326eef200d30f7b8af72353b9e5ec156a8,"archived augmentation, 10-30 dB"
+02-data/archive/STEP010/AS1_T_add_ST.mat,24170049,698820e07b0b9867b05fb751d57819dc016fbc2b9ec6aa5b41eb84304dad5d3f,"archived augmentation, 0-10 dB"
+02-data/archive/STEP010/AS2_T_add_ST.mat,23946101,a2e456b6973f0a0069d33dffc4a36d3bf08d93d534d62b8455f416c8496e8836,"archived augmentation, 0-10 dB"
+02-data/archive/STEP010/CC1_T_add_ST.mat,24267816,1810ded62a1fa7e617acb44e2a1ce0b26d21cf5352d1f459e4ab66d578e19042,"archived augmentation, 0-10 dB"
+02-data/archive/STEP010/EC1_T_add_ST.mat,25006185,4713068d546a8d1231678be540a6d0ba6e67339a482d8be0da68ec5c0997715c,"archived augmentation, 0-10 dB"
+02-data/archive/STEP010/EC2_T_add_ST.mat,24555926,0b4d773798963930da324889385dddd929bf8556332df4a6ad066e568ab11a67,"archived augmentation, 0-10 dB"
+02-data/archive/STEP010/EC3_T_add_ST.mat,23998712,5438a423423b39eeae012305934ba7b867214fd037ed15807b89d95e22142777,"archived augmentation, 0-10 dB"
+02-data/archive/STEP010/ID1_T_add_ST.mat,24102677,9debe8eae3101d026d7b6a029301834fb2528951786c0d3435e1e40d7e10ec4c,"archived augmentation, 0-10 dB"
+02-data/archive/Val/AS1_V_add.mat,8037197,6b7f8971f0aaa42ef895494beab9692a9f4d3a68ced454fe7b49795ec164cbae,"archived augmentation, test templates"
+02-data/archive/Val/AS2_V_add.mat,7991019,604432170efd2c8ee5ba2d29972f71950cb8df63a8a4982b5195ce19ff7a0c1f,"archived augmentation, test templates"
+02-data/archive/Val/CC1_V_add.mat,8488446,12ef578e74f303a4d1d7eba646d5b76327d311b5cf8c1e3e90f3a5d3cfd7ae20,"archived augmentation, test templates"
+02-data/archive/Val/EC1_V_add.mat,8165126,e3ec9328c52b024defc0abed59e4813837af808786435d3f8f6109d7cb7ed4d0,"archived augmentation, test templates"
+02-data/archive/Val/EC2_V_add.mat,8336117,5992ff1afccfe1ab2a2deb48e15a64772227f1bf410e6beb71ba96bec65194a4,"archived augmentation, test templates"
+02-data/archive/Val/EC3_V_add.mat,8207407,5bab8fc625c0737c2a70b59625584da324d5efdec662fe8edc5a442fe8e757d9,"archived augmentation, test templates"
+02-data/archive/Val/ID1_V_add.mat,8029647,1c3a57caf0051de1cdf2067e51a60976b3da2abffe7f7dd8840b61b86ccb15d1,"archived augmentation, test templates"
+07-files/Axial-em300-gmt-25m.grd,75199684,04a97bd45008ce9fc285a133d688fa92b59a80058e7d7d371d16d24f1fa2ca24,"Figs 1, 8: map data"
+07-files/Fissures2015/JdF:Axial_Clague/Axial-2015-fissures-points-geo-v2.txt,3785,6301c0da79bd10768b144ccec53e098d31953bcb2ab5a6fe3614ef950e96d187,"Figs 1, 8: map data"
+07-files/Fissures2011/JdF:Axial_Clague/Axial-2011-fissures-points-geo-v2.txt,3907,730c178244ccf7a9e510d2fadb612d5998500b4d2ba8da28ab687667f3417f0e,"Figs 1, 8: map data"
+07-files/Axial-1998-Fissures.txt,2426,3a98dad0cdeae22395c88f8cf1ca18b9c4f9c83729f3ac2193534132fb5979cc,"Figs 1, 8: map data"
+07-files/axial_lava1998.m,124359,8fa14d39319ae11b8075c89ba6b4889a160dcdc1c611f8e2446c83f52e345038,"Figs 1, 8: map data"
+07-files/axial_lava2011.m,67041,52b5c0ab07e3b32db93c05e632503139b03e8d8eded390b4781834f0d9958f36,"Figs 1, 8: map data"
+07-files/axial_lava2015.m,83632,288fb43f8a4619c579ec68d735fd1b95bcbc5de0bebf52d10563a826a94de372,"Figs 1, 8: map data"
+07-files/axial_calderaRim.m,1387,e197f51f30b9316183abb1df03270d578e728b7766c8b50c4f1e48b1ec1dc2d0,"Figs 1, 8: map data"
+07-files/coastlines_ne110m.txt,88385,98bb0150cb5217e629d62f87c38897d4a1fbf46ba214ff17c86313111c12e8b6,"Figs 1, 8: map data"
+07-files/evMw.txt,6778875,b4c4aa6d12ef5419b02b68b265d03756748e7125695ff7a2fe6d5922570fc0f2,Fig. 1c: magnitudes

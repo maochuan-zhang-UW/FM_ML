@@ -48,11 +48,11 @@ CONF_MIN = 0.95              # class-probability threshold used in Section 4.1
 # Station-event pairs used as training templates.  Section 4.1 excludes them from
 # the CC/ML comparison so the reported agreement is measured only on picks the
 # model never saw; pass --exclude-templates to do the same here.
-TEMPLATE_H5 = REPO_ROOT / "02-data" / "A_wave_dB20_cleaned.h5"
+TEMPLATE_H5 = REPO_ROOT / "02-data" / "raw" / "A_wave_dB20_cleaned.h5"
 
 
 def load_figure_helpers():
-    source = REPO_ROOT / "01-scripts" / "figures" / "manuscript_figures.py"
+    source = REPO_ROOT / "01-scripts" / "figures" / "fig02_03_S1_S4.py"
     spec = importlib.util.spec_from_file_location("make_manuscript_figures", source)
     if spec is None or spec.loader is None:
         raise ImportError(f"Cannot load helpers from {source}")

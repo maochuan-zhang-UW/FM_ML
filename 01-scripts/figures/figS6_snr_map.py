@@ -37,7 +37,7 @@ from matplotlib.ticker import FormatStrFormatter
 from scipy.io import loadmat
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TEMPLATE_MAT = REPO_ROOT / "02-data" / "A_wave_dB20_cleaned.mat"
+TEMPLATE_MAT = REPO_ROOT / "02-data" / "raw" / "A_wave_dB20_cleaned.mat"
 NOISE_END = 20
 PRED_MAT = REPO_ROOT / "02-data" / "A_wave_2015_2021_AxialPolCap_final_conf80_predictions.mat"
 OUTPUT = REPO_ROOT / "03-figs" / "GJI_FigureS6.png"
@@ -52,7 +52,7 @@ LAT_LIM = [45.92, 45.972]
 
 def fig_helpers():
     spec = importlib.util.spec_from_file_location(
-        "mmf", REPO_ROOT / "01-scripts" / "figures" / "manuscript_figures.py"
+        "mmf", REPO_ROOT / "01-scripts" / "figures" / "fig02_03_S1_S4.py"
     )
     mod = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = mod

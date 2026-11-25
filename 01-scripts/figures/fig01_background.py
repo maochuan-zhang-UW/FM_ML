@@ -8,8 +8,9 @@ of each 64-sample catalogue window (P pick at sample 32).
 
 Inputs (defaults are the local data layout; see --help)
   07-files/  bathymetry grid, fissures, lava flows, caldera rim, coastlines, evMw.txt
-  catalogue of earthquakes with >= 5 P and S picks (FM4 Felix_kmean_morethan5.mat)
-  templates (02-data/A_wave_dB20_cleaned.mat)
+  02-data/raw/Felix_kmean_morethan5.mat  catalogue earthquakes with >= 5 P and S picks
+  02-data/raw/A_wave_dB20_cleaned.mat    templates
+  02-data/raw/ColormapZMC.mat            bathymetry colour map
   catalogue windows (02-data/A_wave_2015_2021_AxialPolCap_final_conf80_predictions.mat)
 
 Usage (from the repository root): python 01-scripts/figures/fig01_background.py
@@ -26,7 +27,6 @@ from matplotlib.colors import ListedColormap
 from scipy.io import loadmat, netcdf_file
 
 ROOT = Path(__file__).resolve().parents[2]
-GH = ROOT.parent
 FILES = ROOT / "07-files"
 STATIONS = {"AS1": (-129.9992, 45.9336), "AS2": (-130.0141, 45.9338), "CC1": (-130.0089, 45.9547),
             "EC1": (-129.9797, 45.9496), "EC2": (-129.9738, 45.9397), "EC3": (-129.9785, 45.9361),
@@ -203,10 +203,10 @@ def panel_cd(fig, mw_t, mw_n, snr_t, snr_n):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--catalog", default=str(GH / "FM4" / "02-data" / "A_All" / "Felix_kmean_morethan5.mat"))
-    ap.add_argument("--templates", default=str(ROOT / "02-data" / "A_wave_dB20_cleaned.mat"))
+    ap.add_argument("--catalog", default=str(ROOT / "02-data" / "raw" / "Felix_kmean_morethan5.mat"))
+    ap.add_argument("--templates", default=str(ROOT / "02-data" / "raw" / "A_wave_dB20_cleaned.mat"))
     ap.add_argument("--windows", default=str(ROOT / "02-data" / "A_wave_2015_2021_AxialPolCap_final_conf80_predictions.mat"))
-    ap.add_argument("--colormap", default=str(GH / "FM4" / "ColormapZMC.mat"))
+    ap.add_argument("--colormap", default=str(ROOT / "02-data" / "raw" / "ColormapZMC.mat"))
     ap.add_argument("--out", default=str(ROOT / "03-figs" / "GJI_Figure01.png"))
     a = ap.parse_args()
     rim = matlab_blocks(FILES / "axial_calderaRim.m")[0]

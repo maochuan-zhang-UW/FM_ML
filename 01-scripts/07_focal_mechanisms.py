@@ -29,13 +29,12 @@ Output (--out): {cc,ml}/ SKHASH inputs and out.txt, and mechanisms.csv with
 one row per cluster: location, time, number of events, both mechanisms with
 their quality, fault type (Table S4) and the Kagan angle between them.
 
-Usage (from the repository root):
-  python 01-scripts/07_focal_mechanisms.py --clusters <F_2015Erp_V1V2V3_Po_polished.mat> \
-      --predictions 02-data/A_wave_2015_2021_AxialPolCap_final_conf80_predictions.mat \
-      --geometry <TakeOffAzimuth0203_ext2026.mat> --skhash <SKHASH/SKHASH/SKHASH.py>
+Usage (from the repository root; inputs default to 02-data/raw/):
+  python 01-scripts/07_focal_mechanisms.py --skhash <SKHASH>/SKHASH/SKHASH.py
 """
 import argparse
 import collections
+import os
 import datetime
 import string
 import subprocess
@@ -246,10 +245,11 @@ def merge(out):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--clusters", required=True)
-    ap.add_argument("--predictions", required=True)
-    ap.add_argument("--geometry", required=True)
-    ap.add_argument("--skhash", required=True)
+    ap.add_argument("--clusters", default=str(ROOT / "02-data" / "raw" / "F_2015Erp_V1V2V3_Po_polished.mat"))
+    ap.add_argument("--predictions", default=str(ROOT / "02-data" / "A_wave_2015_2021_AxialPolCap_final_conf80_predictions.mat"))
+    ap.add_argument("--geometry", default=str(ROOT / "02-data" / "raw" / "TakeOffAzimuth0203_ext2026.mat"))
+    ap.add_argument("--skhash", default=os.environ.get("SKHASH"), required="SKHASH" not in os.environ,
+                    help="path to SKHASH.py (or set the SKHASH environment variable)")
     ap.add_argument("--conf", type=float, default=0.95)
     ap.add_argument("--min-confident", type=int, default=5)
     ap.add_argument("--out", default=str(ROOT / "02-data" / "focal_mechanisms_2015_2021"))
