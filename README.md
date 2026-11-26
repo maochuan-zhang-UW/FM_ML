@@ -20,11 +20,12 @@ Manuscript submitted to *Geophysical Journal International*.
 
 AxialPolCap is a P-wave first-motion polarity classifier that adapts the PolarCAP
 architecture (Chakraborty et al. 2022) to ocean-bottom seismometer data from the OOI
-Regional Cabled Array at Axial Seamount. This repository holds the code that builds the
-training and test data, benchmarks four published classifiers against waveform
-cross-correlation (CC), compares training from scratch with transfer learning, applies
-the model to the 2015–2021 catalogue, and generates the manuscript figures. It also
-holds the trained model weights.
+Regional Cabled Array at Axial Seamount. This repository holds the complete workflow
+behind the paper, in Python, as one numbered pipeline: it builds the training and
+test data from the template waveforms and real seafloor noise, trains and evaluates the
+models, applies the final model to the 2015–2021 catalogue, computes composite focal
+mechanisms from catalogue (CC) and AxialPolCap polarities with SKHASH, and draws the
+manuscript figures. It also holds the trained model weights.
 
 Headline results (station averages):
 
@@ -36,11 +37,89 @@ Headline results (station averages):
 | Four published deep-learning models on the same test data, unshifted (Fig. 3) | 82–89% |
 | Cross-correlation on the same test data (Fig. 3) | ~92% |
 | Leave-one-station-out, unshifted (Fig. 4) | 94.8–99.6% |
-| Agreement with CC, 2015–2021 catalogue, templates excluded (Section 4.1) | 82.3% of 230,565 picks |
-| Median Kagan angle, CC vs AxialPolCap composite mechanisms | ~13° (3,145 clusters) |
+| Agreement with CC, 2015–2021 catalogue, templates excluded (Section 4.1) | 84.4% of 229,574 picks |
+| Median Kagan angle, CC vs AxialPolCap composite mechanisms, both quality A–B (Section 4.1) | ~15° (1,152 clusters; 38° over all 3,611 paired) |
 
 Seven stations are used throughout: AXAS1, AXAS2, AXCC1, AXEC1, AXEC2, AXEC3, AXID1
 (`AS1`, `AS2`, `CC1`, `EC1`, `EC2`, `EC3`, `ID1` in code).
+
+---
+
+## Pipeline
+
+Run every step from the repository root. Step 0 checks the input data, steps 1–3 build
+the data, step 4 trains, steps 5–7 apply the final model to the catalogue (Section 4.1).
+
+**Getting the data.** Download the data archive (see **Data availability**) and unpack it
+in the repository root. It holds `02-data/raw/` (templates, noise library, catalogue
+windows, CC clusters, station geometry), `02-data/archive/` (the augmented waveforms
+used for the paper) and the map files in `07-files/`: 50 files, 1.8 GB, listed with
+their SHA-256 in `data_manifest.csv`. Then run `python 01-scripts/00_check_data.py`.
+
+| Step | Script | Does | Output |
+|---|---|---|---|
+| 0 | `00_check_data.py` | checks every input file against `data_manifest.csv` | |
+| 1 | `01_prepare_inputs.py` | converts the templates, noise library and observed SNR from MATLAB `.mat` to HDF5 | `02-data/prepared/inputs.h5` |
+| 2 | `02_augment.py` | adds real seafloor noise to every template at a target SNR (lognormal fit to the catalogue, or uniform) | `02-data/augmented/*.h5` |
+| 3 | `03_build_datasets.py` | time-shifts the P arrival, crops 64 samples, normalizes, splits 80/10/10 | `02-data/K_aug/<set>/*.npy` |
+| 4 | `04_train.py` (all runs: `04_run_all_training.sh`) | trains one strategy and evaluates it per station on the three test sets | `06-models/retrain_20261122/` |
+| 5 | `05_apply_to_catalog.py` | classifies the 2015–2021 catalogue windows with `AxialPolCap_final` | predictions `.mat` |
+| 6 | `06_compare_with_cc.py` | agreement with CC polarities (Section 4.1) | `02-data/section41_agreement.json` |
+| – | `benchmark/score_benchmark.py` | accuracy and confusion matrices of four published classifiers (Fig. 3, S1, Table S2) | `03-figs/benchmark_confusion_matrix.csv` |
+| 7 | `07_focal_mechanisms.py` | composite mechanisms from CC and from AxialPolCap polarities with SKHASH, Kagan angles | `02-data/focal_mechanisms_2015_2021/mechanisms.csv` |
+
+The commands that rebuild every dataset of the paper:
+
+```bash
+python 01-scripts/01_prepare_inputs.py
+# augmentation: original-SNR, high-SNR and low-SNR training sets, and the test set
+python 01-scripts/02_augment.py --split train --snr lognormal --target 15000 --out 02-data/augmented/train_org.h5
+python 01-scripts/02_augment.py --split train --snr uniform --snr-range 10 30 --target 15000 --out 02-data/augmented/train_step.h5
+python 01-scripts/02_augment.py --split train --snr uniform --snr-range 0 10 --target 15000 --out 02-data/augmented/train_step010.h5
+python 01-scripts/02_augment.py --split test --snr lognormal --target 5000 --out 02-data/augmented/test.h5
+# training sets (sigma in samples of 0.01 s)
+python 01-scripts/03_build_datasets.py --input 02-data/augmented/train_org.h5 --mode trainvaltest --out 02-data/K_aug/TMSF_Tra_000
+python 01-scripts/03_build_datasets.py --input 02-data/augmented/train_org.h5 --mode trainvaltest --sigma-samples 1 --seed 1 --out 02-data/K_aug/TMSF_Tra_001
+python 01-scripts/03_build_datasets.py --input 02-data/augmented/train_org.h5 --mode trainvaltest --sigma-samples 2 --seed 2 --out 02-data/K_aug/TMSF_Tra_002s
+python 01-scripts/03_build_datasets.py --input 02-data/augmented/train_step.h5 --mode trainvaltest --out 02-data/K_aug/STEP
+python 01-scripts/03_build_datasets.py --input 02-data/augmented/train_step010.h5 --mode trainvaltest --out 02-data/K_aug/STEP010
+# test sets: unshifted, sigma = 0.01 s, sigma = 0.02 s
+python 01-scripts/03_build_datasets.py --input 02-data/augmented/test.h5 --mode test --out 02-data/K_aug/Val
+python 01-scripts/03_build_datasets.py --input 02-data/augmented/test.h5 --mode test --sigma-samples 1 --seed 1 --out 02-data/K_aug/TMSF_Val_001
+python 01-scripts/03_build_datasets.py --input 02-data/augmented/test.h5 --mode test --sigma-samples 2 --seed 2 --out 02-data/K_aug/TMSF_Val
+```
+
+| Set | Augmented input | Shift σ | Used for |
+|---|---|---|---|
+| `TMSF_Tra_000` | original SNR | 0 | Figs 4, 5 (original SNR), 6, S3 |
+| `TMSF_Tra_001` | original SNR | 0.01 s | Fig. 7, final model |
+| `TMSF_Tra_002s` | original SNR | 0.02 s | Fig. 7 |
+| `STEP` | 10–30 dB | 0 | Fig. 5, high SNR |
+| `STEP010` | 0–10 dB | 0 | Fig. 5, low SNR |
+| `Val`, `TMSF_Val_001`, `TMSF_Val` | test templates, original SNR | 0, 0.01 s, 0.02 s | test data of every accuracy in Section 3 |
+
+**Archived datasets.** Augmentation is random, so a rerun gives statistically equivalent
+but not identical waveforms. The augmented waveforms used for the paper were generated
+with MATLAB (the original scripts are in the git history before this restructuring) and
+are in `02-data/archive/` of the data archive. `03_build_datasets.py` reads them too and
+rebuilds the paper's datasets exactly, e.g.
+`--input 02-data/archive/Val --suffix _V_add.mat --mode test --out 02-data/K_aug/Val`
+(`Org`, `STEP`, `STEP010` with `--suffix _T_add.mat`, `_T_add_ST.mat`, `_T_add_ST.mat`).
+
+**Checks of the Python port** (`01-scripts/checks/`):
+- `03_build_datasets.py` on the archived augmentation reproduces `Val` and `TMSF_Tra_000`
+  exactly and `STEP` to float32 rounding;
+- `02_augment.py` against the archived augmentation (`compare_augmentation.py`): identical
+  waveform counts and polarity balance for every station and set, median SNR within
+  0.2 dB, two-sample Kolmogorov–Smirnov D ≤ 0.021;
+- a model trained on Python-augmented data (`06-models/checks/`) scores 97.4 / 96.5 /
+  93.1% on the unshifted / 0.01 s / 0.02 s test sets, against 97.4–97.6 / 96.7–96.8 /
+  93.4–93.5% for the three seeds trained on the archived data;
+- `benchmark/score_benchmark.py` reproduces every benchmark accuracy and confusion
+  matrix of Fig. 3, Fig. S1 and Table S2 exactly from the stored model predictions
+  (`benchmark/provenance/` holds the scripts that ran the four models);
+- `06_compare_with_cc.py` reproduces every Section 4.1 statistic of the earlier
+  manuscript version exactly when given that version's predictions.
 
 ---
 
@@ -95,11 +174,11 @@ data and 96.8% with σ = 0.01 s shifts.
 |---|---|
 | `06-models/AxialPolCap_final.keras` (+ `.json`) | final AxialPolCap model, Section 3.3 |
 | `06-models/retrain_20261122/*.keras`, `*.json` | the 45 training runs behind Figs 4–7 and S3: per-epoch validation accuracy, trainable-parameter count and per-station test accuracy on the unshifted, σ = 0.01 s and σ = 0.02 s test sets |
-| `06-models/PolarPicker_h5_20260308_154910.keras` | model applied to the 2015–2021 catalogue for the CC comparison of Section 4.1 (`apply_polarpicker_h5_2015_2021_conf80.py`) |
+| `06-models/checks/python_augmentation_scratch_s2.json` | scores of a model trained on Python-augmented data (pipeline check) |
 
 Run names follow `<training set>_<strategy>_s<seed>[_loso<station>]`. The strategies are
 `scratch`, `freezecls` (classifier frozen), `finetune` and `probe` (linear probing). The
-training sets are listed under **Reproducing Figs 4–7 and S3**.
+training sets are listed under **Pipeline**.
 
 Load with `keras.models.load_model(path, compile=False)`; polarity probabilities are
 `model.predict(X)[1]` (class 0 = negative, 1 = positive), with each 64-sample window
@@ -108,81 +187,42 @@ max-normalized first.
 To pick polarities for a new catalogue with the final model:
 
 ```bash
-python 01-scripts/application/apply_to_catalog.py --input <catalogue.mat> --output <predictions.mat>
+python 01-scripts/05_apply_to_catalog.py --input <catalogue.mat> --output <predictions.mat>
 ```
 
 The input holds a struct array `Felix` with 64-sample windows `W_{STA}` centred on the P
-pick. Each `Po_{STA}` is returned as `[catalogue polarity, prediction, confidence, entropy]`.
+pick. Each `Po_{STA}` is returned as `[catalogue polarity, prediction, confidence, entropy]`;
+the prediction is 0 where the confidence is below `--confidence-threshold` (default 0.8).
+Section 4 retains predictions with confidence ≥ 0.95.
 
 ---
 
 ## Manuscript figures
 
+All figures are drawn in Python by the scripts in `01-scripts/figures/`.
+
 | Manuscript | File in `03-figs/` | Produced by |
 |---|---|---|
-| Figure 1 | `GJI_Figure01.png` | `Figure01_background.m`, `Figure01_panelCD_prep.m`, `figure_01_standalone.py` |
-| Figure 2 | `GJI_Figure02.png` | `make_manuscript_figures.py --figures 15` |
-| Figure 3 | `GJI_Figure03.png` | `make_manuscript_figures.py --figures 4` |
-| Figures 4–7 | `GJI_Figure04.png` – `GJI_Figure07.png` | `evaluation/plot_training_strategy_figures.py` |
-| Figure 8 | `GJI_Figure08.png` | `Figure08_mechanism_comparison.m` |
+| Figure 1 | `GJI_Figure01.png` | `fig01_background.py` |
+| Figure 2 | `GJI_Figure02.png` | `fig02_03_S1_S4.py` |
+| Figure 3 | `GJI_Figure03.png` | `fig02_03_S1_S4.py` |
+| Figures 4–7, S3 | `GJI_Figure04.png` – `GJI_Figure07.png`, `GJI_FigureS3.png` | `fig04_07_S3_training_strategies.py` |
+| Figure 8 | `GJI_Figure08.png` | `fig08_mechanisms.py` |
 | Figure 9 | `GJI_Figure09.png` | schematic, drawn separately |
-| Figure S1 | `GJI_FigureS1.png` | `make_manuscript_figures.py --figures 17` |
+| Figure S1 | `GJI_FigureS1.png` | `fig02_03_S1_S4.py` |
 | Figure S2 | `GJI_FigureS2.jpg` | architecture diagram, modified from Chakraborty et al. (2022) |
-| Figure S3 | `GJI_FigureS3.png` | `evaluation/plot_training_strategy_figures.py` |
-| Figure S4 | `GJI_FigureS4.png` | `make_manuscript_figures.py --figures 10` |
-| Figure S5 | `GJI_FigureS5.png` | `plot_figure11_2015_2021.py` (command below) |
-| Figure S6 | `GJI_FigureS6.png` | `plot_figureS5_snr_map.py` (command below) |
-| Figure S7 | `GJI_FigureS7.png` | `Figure09_kagan_angle.m` |
-| Table S2 | `TableS1_benchmark_accuracy.md` | `make_manuscript_figures.py` |
+| Figure S4 | `GJI_FigureS4.png` | `fig02_03_S1_S4.py` |
+| Figure S5 | `GJI_FigureS5.png` | `figS5_disagreement_map.py --exclude-templates` |
+| Figure S6 | `GJI_FigureS6.png` | `figS6_snr_map.py` |
+| Figure S7 | `GJI_FigureS7.png` | `figS7_kagan_histogram.py` |
+| Table S2 | `TableS1_benchmark_accuracy.md` | `fig02_03_S1_S4.py` |
 
-The `GJI_*` files are the images as they appear in the submitted manuscript. The values
-plotted in Figs 4–7 are in `03-figs/training_strategy_numbers.json`. The older
-`FigureNN_python.png` files use an earlier internal numbering and are kept for history.
+Figs 3 and S1 and Table S2 read `03-figs/benchmark_confusion_matrix.csv`, written by
+`benchmark/score_benchmark.py`; run that first. The cross-correlation row is a constant:
+its inputs are not in the data archive (see `benchmark/provenance/README.md`).
 
-Commands whose defaults differ from the published figures:
-
-```bash
-# Figure S5: spatial disagreement between AxialPolCap and CC
-python 01-scripts/plot_figure11_2015_2021.py \
-    --grid-m 200 --min-per-cell 150 --ratio-max 30 --exclude-templates \
-    --output 03-figs/GJI_FigureS5.png
-
-# Figure S6: spatial variation of P-wave SNR, on the same grid and cell minimum
-python 01-scripts/plot_figureS5_snr_map.py \
-    --grid-m 200 --min-per-cell 150 \
-    --output 03-figs/GJI_FigureS6.png
-```
-
----
-
-## Reproducing Figs 4–7 and S3
-
-1. **Augmented waveforms** (MATLAB, `01-scripts/data_preparation/augmentation/`):
-   - `K_augument_mimic_org.m` builds the original catalogue SNR distribution;
-   - `K_augument_mimic_step.m` builds high SNR, 10–30 dB;
-   - `K_augument_mimic_step_0_10.m` builds low SNR, 0–10 dB;
-   - `L_saveNPY_Validate.m` builds the test templates.
-
-   These are the scripts as used and contain absolute paths.
-2. **Test sets** (`augmentation/L2_saveNPY_val.py`, `L3_saveNPY_TMSF_001_val.py`,
-   `L3_saveNPY_TMSF_002_val.py`): unshifted `Val`, σ = 0.01 s `TMSF_Val_001`, and
-   σ = 0.02 s `TMSF_Val`.
-3. **Training sets** (`data_preparation/05_build_timeshift_training_sets.py`). All share
-   the same templates, labels and split:
-
-   | Set | Input | Shift σ (samples) | Used for |
-   |---|---|---|---|
-   | `TMSF_Tra_000` | `Org/*_T_add.mat` | 0 | Figs 4, 5 (original SNR), 6, S3 |
-   | `TMSF_Tra_001` | `Org/*_T_add.mat` | 1 (0.01 s) | Fig. 7, final model |
-   | `TMSF_Tra_002s` | `Org/*_T_add.mat` | 2 (0.02 s) | Fig. 7 |
-   | `STEP` | `STEP/*_T_add_ST.mat` | 0 | Fig. 5, high SNR |
-   | `STEP010` | `STEP010/*_T_add_ST.mat` | 0 | Fig. 5, low SNR |
-
-4. **Training:** `bash 01-scripts/training/run_training_strategies.sh` runs all 45 jobs
-   of `training/retrain_fig4_strategies.py`. Transfer-learning runs need the pretrained
-   `PolarCAP.h5` from Chakraborty et al. (2022), located through `POLARCAP_H5`; the test
-   sets are located through `AXIAL_EVAL_ROOT`.
-5. **Figures:** `python 01-scripts/evaluation/plot_training_strategy_figures.py`.
+Each script writes its `GJI_*` file into `03-figs/`. The values plotted in Figs 4–7 are
+in `03-figs/training_strategy_numbers.json`.
 
 ---
 
@@ -190,55 +230,42 @@ python 01-scripts/plot_figureS5_snr_map.py \
 
 ```
 01-scripts/
-  data_preparation/      training/test datasets (NPY and HDF5 variants);
-                         augmentation/ holds the MATLAB augmentation and NPY conversion scripts
-  benchmark/             evaluate the PolarCAP baseline
-  training/              train AxialPolCap; LOSO; transfer learning; the Figs 4-7 runs
-  evaluation/            evaluation and the Figs 4-7 / S3 plots
-  application/           apply the model to the 2015-2021 catalogue
-  build_skhash_input_*.py, build_hash_input_*.py, compare_skhash_cc_ml.py
-                         focal-mechanism inputs and CC/ML mechanism comparison
-  plot_figure11_2015_2021.py, plot_figureS4_2022_2026.py,
-  plot_figureS5_snr_map.py, plot_disagreement_vs_snr.py
-                         supplementary figures
-  *.m                    MATLAB scripts for Figures 1, 8 and S7
-  make_manuscript_figures.py
-                         remaining manuscript figures; --figures N regenerates a subset
-03-figs/                 figure outputs (GJI_* = submitted versions)
-06-models/               trained Keras models and per-run results
-04-logs/                 run logs
+  00_check_data.py ... 07_focal_mechanisms.py   the pipeline, in order
+  04_run_all_training.sh   the 45 training runs behind Figs 4-7 and S3
+  mechanism_tools.py       P/T/B axes, fault type (Table S4), Kagan angle, SKHASH output
+  figures/                 one script per manuscript figure (see table above)
+  checks/                  checks of the Python port against the archived MATLAB data
+  benchmark/               benchmark scoring; provenance/ holds the scripts that ran the four models
+03-figs/                   figure outputs (GJI_* = manuscript versions)
+06-models/                 trained Keras models and per-run results
 ```
 
-Not tracked: `02-data/` and `07-files/` (input waveforms, catalogues, bathymetry and
-velocity models), the vendored third-party model repositories and pretrained weights
-under `01-scripts/`, and the manuscript sources. See **Data availability**.
+Not tracked: `02-data/` and `07-files/` (inputs, from the data archive, and
+intermediate files), the pretrained PolarCAP weights, and the manuscript sources.
 
 ---
 
 ## Environment
 
-The results in Figs 4–7 and S3 and the final model were produced with Python 3.10,
-TensorFlow 2.16.2 and Keras 3.11.3 (`environment.yml`):
+Everything runs in Python 3.10 with TensorFlow 2.16.2 and Keras 3.11.3
+(`environment.yml`); no MATLAB is needed:
 
 ```bash
 conda env create -f environment.yml
 conda activate axialpolcap
 ```
 
-Run every script from the repository root:
-
-```bash
-python 01-scripts/<subdir>/<script>.py
-```
+Step 7 also needs SKHASH (Skoumal et al. 2024), cloned from
+<https://code.usgs.gov/esc/SKHASH> and passed with `--skhash <path>/SKHASH/SKHASH.py`.
+The transfer-learning runs of step 4 need the pretrained `PolarCAP.h5` of Chakraborty et
+al. (2022) in `06-models/` (or set `POLARCAP_H5`).
 
 Notes:
 
 - The TensorFlow Metal plugin crashes during `model.predict` and fine-tuning on macOS.
   Inference and training scripts call `tf.config.set_visible_devices([], 'GPU')`.
-- Models whose outputs are wrapped in named `Lambda` layers (from `train_loso.py`) must
-  be loaded with `keras.models.load_model(path, safe_mode=False)`.
-- `make_manuscript_figures.py` needs `cartopy` for the map panel; Figures 1, 8 and S7
-  use MATLAB (R2024a).
+- SKHASH's pure-Python grid search needs 1–3 GB per worker for composites with many
+  polarities; `07_focal_mechanisms.py` uses four workers.
 
 ---
 
@@ -248,9 +275,10 @@ The seismic data were downloaded from the EarthScope Consortium Data Management 
 with network code `OO`. The continuously updated earthquake catalogue is at
 <https://axialdd.ldeo.columbia.edu>. The composite focal-mechanism catalogue and polarity
 determinations produced in this study are at
-<http://axial.ocean.washington.edu/FocalMechanisms.html>. Input data are not stored in
-this repository because of their size. Focal mechanisms are computed with SKHASH
-(Skoumal et al. 2024; <https://code.usgs.gov/esc/SKHASH>).
+<http://axial.ocean.washington.edu/FocalMechanisms.html>. The input data of this
+repository (`data_manifest.csv`) are archived on Zenodo: DOI to be added on release.
+Focal mechanisms are computed with SKHASH (Skoumal et al. 2024;
+<https://code.usgs.gov/esc/SKHASH>).
 
 ---
 

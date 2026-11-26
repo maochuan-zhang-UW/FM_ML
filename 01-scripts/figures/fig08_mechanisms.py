@@ -2,13 +2,15 @@
 polarities before, during and after the 2015 eruption, and the Kagan angle
 between the two mechanisms of each cluster (g-i).
 
-Only clusters resolved by both methods and classified as normal, reverse or
+Only clusters whose CC and AxialPolCap mechanisms are both well constrained
+(quality A or B, Table S3; --quality) and classified as normal, reverse or
 strike-slip by both (Table S4) are drawn, so all panels of a column show the
 same clusters.
 
 Input: 02-data/focal_mechanisms_2015_2021/mechanisms.csv (07_focal_mechanisms.py)
 Usage (from the repository root): python 01-scripts/figures/fig08_mechanisms.py
 """
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -71,14 +73,19 @@ def beachball(ax, lon, lat, sdr, colour, aspect):
 
 
 def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--quality", default="AB", help="mechanism quality grades kept for both methods")
+    ap.add_argument("--out", default=str(ROOT / "03-figs" / "GJI_Figure08.png"))
+    a = ap.parse_args()
     df = pd.read_csv(ROOT / "02-data" / "focal_mechanisms_2015_2021" / "mechanisms.csv", parse_dates=["time"])
-    df = df[df.kagan.notna() & df.fault_type_cc.isin(list("NRS")) & df.fault_type_ml.isin(list("NRS"))]
+    df = df[df.kagan.notna() & df.quality_cc.isin(list(a.quality)) & df.quality_ml.isin(list(a.quality))
+            & df.fault_type_cc.isin(list("NRS")) & df.fault_type_ml.isin(list("NRS"))]
     periods = {"Before": df.time < ERUPT, "During": (df.time >= ERUPT) & (df.time < ENDCO), "After": df.time >= ENDCO}
     rim = caldera_rim()
     aspect = 1 / np.cos(np.radians(np.mean(LAT_LIM)))
     plt.rcParams.update({"font.family": "Helvetica", "font.size": 7.5})
     fig, axs = plt.subplots(3, 3, figsize=(7.0, 8.8), sharex=True, sharey=True,
-                            gridspec_kw=dict(left=0.10, right=0.98, top=0.96, bottom=0.12, hspace=0.12, wspace=0.06))
+                            gridspec_kw=dict(left=0.10, right=0.98, top=0.96, bottom=0.12, hspace=0.20, wspace=0.06))
     cmap = plt.get_cmap("viridis", 24)
     rows = ("CC polarities", "AxialPolCap polarities", "Kagan angle")
     for c, (per, sel) in enumerate(periods.items()):
@@ -113,11 +120,12 @@ def main():
         print(f"{per}: n = {len(d)}")
     handles = [plt.Line2D([], [], marker="o", ls="", mfc=TYPE_COL[k], mec="k", mew=0.5, ms=6, label=TYPE_NAME[k])
                for k in "NRS"]
-    fig.legend(handles=handles, loc="center", bbox_to_anchor=(0.54, 0.355), ncol=3, frameon=False, fontsize=8)
+    y_gap = (axs[1, 0].get_position().y0 + axs[2, 0].get_position().y1) / 2
+    fig.legend(handles=handles, loc="center", bbox_to_anchor=(0.54, y_gap), ncol=3, frameon=False, fontsize=8)
     cax = fig.add_axes([0.32, 0.05, 0.44, 0.014])
     cb = fig.colorbar(sc, cax=cax, orientation="horizontal", ticks=range(0, KMAX + 1, 20))
     cb.set_label("Kagan angle (°)", fontsize=8)
-    out = ROOT / "03-figs" / "GJI_Figure08.png"
+    out = Path(a.out)
     fig.savefig(out, dpi=300)
     print("wrote", out, f"(clusters plotted: {len(df)})")
 
