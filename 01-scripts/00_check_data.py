@@ -8,6 +8,10 @@ then run
 
   python 01-scripts/00_check_data.py           # sizes and checksums
   python 01-scripts/00_check_data.py --quick   # sizes only
+
+The results archive (step 5-8 outputs) is listed in results_manifest.csv:
+
+  python 01-scripts/00_check_data.py --manifest results_manifest.csv
 """
 import argparse
 import csv
@@ -29,9 +33,10 @@ def sha256(path):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--quick", action="store_true", help="check sizes only")
+    ap.add_argument("--manifest", default="data_manifest.csv", help="manifest, relative to the repository root")
     a = ap.parse_args()
     bad = 0
-    rows = list(csv.DictReader(open(ROOT / "data_manifest.csv")))
+    rows = list(csv.DictReader(open(ROOT / a.manifest)))
     for r in rows:
         p = ROOT / r["path"]
         if not p.exists():
@@ -44,7 +49,7 @@ def main():
             continue
         bad += 1
         print(f"{msg:15s} {r['path']}  ({r['used_for']})")
-    print(f"{len(rows) - bad} of {len(rows)} input files OK")
+    print(f"{len(rows) - bad} of {len(rows)} files OK")
     sys.exit(1 if bad else 0)
 
 

@@ -55,6 +55,9 @@ in the repository root. It holds `02-data/raw/` (templates, noise library, catal
 windows, CC clusters, station geometry), `02-data/archive/` (the augmented waveforms
 used for the paper) and the map files in `07-files/`: 50 files, 1.8 GB, listed with
 their SHA-256 in `data_manifest.csv`. Then run `python 01-scripts/00_check_data.py`.
+The results archive holds the outputs of steps 5–8 (listed in `results_manifest.csv`;
+check with `--manifest results_manifest.csv`), so the Section 4 figures can be drawn
+without rerunning the model or SKHASH.
 
 | Step | Script | Does | Output |
 |---|---|---|---|
@@ -67,6 +70,7 @@ their SHA-256 in `data_manifest.csv`. Then run `python 01-scripts/00_check_data.
 | 6 | `06_compare_with_cc.py` | agreement with CC polarities (Section 4.1) | `02-data/section41_agreement.json` |
 | – | `benchmark/score_benchmark.py` | accuracy and confusion matrices of four published classifiers (Fig. 3, S1, Table S2) | `03-figs/benchmark_confusion_matrix.csv` |
 | 7 | `07_focal_mechanisms.py` | composite mechanisms from CC and from AxialPolCap polarities with SKHASH, Kagan angles | `02-data/focal_mechanisms_2015_2021/mechanisms.csv` |
+| 8 | `08_export_results.py` | exports the AxialPolCap polarities as a CSV, one row per pick | `02-data/results/AxialPolCap_polarities_2015_2021.csv` |
 
 The commands that rebuild every dataset of the paper:
 
@@ -230,7 +234,7 @@ in `03-figs/training_strategy_numbers.json`.
 
 ```
 01-scripts/
-  00_check_data.py ... 07_focal_mechanisms.py   the pipeline, in order
+  00_check_data.py ... 08_export_results.py     the pipeline, in order
   04_run_all_training.sh   the 45 training runs behind Figs 4-7 and S3
   mechanism_tools.py       P/T/B axes, fault type (Table S4), Kagan angle, SKHASH output
   figures/                 one script per manuscript figure (see table above)
@@ -276,7 +280,9 @@ with network code `OO`. The continuously updated earthquake catalogue is at
 <https://axialdd.ldeo.columbia.edu>. The composite focal-mechanism catalogue and polarity
 determinations produced in this study are at
 <http://axial.ocean.washington.edu/FocalMechanisms.html>. The input data of this
-repository (`data_manifest.csv`) are archived on Zenodo: DOI to be added on release.
+repository (`data_manifest.csv`) and the results of steps 5–8 (`results_manifest.csv`,
+including the AxialPolCap polarities and the focal mechanisms) are archived on Zenodo:
+DOI to be added on release.
 Focal mechanisms are computed with SKHASH (Skoumal et al. 2024;
 <https://code.usgs.gov/esc/SKHASH>).
 

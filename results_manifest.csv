@@ -1,0 +1,22 @@
+path,bytes,sha256,used_for
+02-data/A_wave_2015_2021_AxialPolCap_final_conf80_predictions.mat,176720940,10663eded399a8206fa3e73318bba01ed12108bfdf42944af1a9a20ec8d2673b,"step 5 output: AxialPolCap predictions for 2015-2021 (input of steps 6-8, Figs S4, S5)"
+02-data/focal_mechanisms_2015_2021/cc/amp.dat,11353547,1adcba1c76e4c8ecc1ef36ea2556ec0a42bd6136886ce9d5b01d5098d59f9fa6,step 7 output: SKHASH input and output files
+02-data/focal_mechanisms_2015_2021/cc/control_file.txt,634,8a9a407cfa5b030d5a7be6027e76527bc0d853f7acb11fa5de815be7d1825490,step 7 output: SKHASH input and output files
+02-data/focal_mechanisms_2015_2021/cc/out.txt,620009,e538fd068b62526f3c3ed33550d901e33cc9880867363a7de1f7a3afdd43d93a,step 7 output: SKHASH input and output files
+02-data/focal_mechanisms_2015_2021/cc/phase.dat,3285991,8c1b098d14759e28d3d7199af7d15ad10f95cdc8ed27d931c153113aa0fa05f8,step 7 output: SKHASH input and output files
+02-data/focal_mechanisms_2015_2021/cc/reverse.txt,0,e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855,step 7 output: SKHASH input and output files
+02-data/focal_mechanisms_2015_2021/cc/statcor.txt,3640,524209fdb5e38c8befe447bfe16a56744d08950bb382832004841e01a8483969,step 7 output: SKHASH input and output files
+02-data/focal_mechanisms_2015_2021/cc/stations.txt,16926,f6d3168148307ee156c55c91be603f716a1dcfb9c2cb4c465400078c072a1fab,step 7 output: SKHASH input and output files
+02-data/focal_mechanisms_2015_2021/cc/vmodel.txt,1173,0b663a677461b5ad2bf8e42ef505403af6ae81ff18fa39cb56c12f63919cfc39,step 7 output: SKHASH input and output files
+02-data/focal_mechanisms_2015_2021/clusters.csv,353421,fd2ef1da68fd2c4e6f1a2671947d5125b81cae859cf14f09294f9160aac484b5,step 7 output: composite clusters
+02-data/focal_mechanisms_2015_2021/mechanisms.csv,771877,9b6bc1e539afa1547a2808c0331942edc3234bd14afbefa0afd1abb84dc3d767,"step 7 output: CC and AxialPolCap composite mechanisms, Kagan angles (Figs 8, S7, Table S3)"
+02-data/focal_mechanisms_2015_2021/ml/amp.dat,8385189,6271821fc4d2ce82c993ee479522eddbc78d38f5652c02e10ff6d44a07010ed6,step 7 output: SKHASH input and output files
+02-data/focal_mechanisms_2015_2021/ml/control_file.txt,634,aec6ca26dc226ba6754dd62932fbc4cc36562f8acd43f2db1bbb4c0d055b22da,step 7 output: SKHASH input and output files
+02-data/focal_mechanisms_2015_2021/ml/out.txt,615373,c84e4e3ecc3037e18994e544294b1a439750ca6f727aac202391945be2ad3986,step 7 output: SKHASH input and output files
+02-data/focal_mechanisms_2015_2021/ml/phase.dat,2596784,db0ca5a8d2a302e123a5dc472affc700c01dc3ab15732825209a0d2f08e7e981,step 7 output: SKHASH input and output files
+02-data/focal_mechanisms_2015_2021/ml/reverse.txt,0,e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855,step 7 output: SKHASH input and output files
+02-data/focal_mechanisms_2015_2021/ml/statcor.txt,3640,524209fdb5e38c8befe447bfe16a56744d08950bb382832004841e01a8483969,step 7 output: SKHASH input and output files
+02-data/focal_mechanisms_2015_2021/ml/stations.txt,16926,f6d3168148307ee156c55c91be603f716a1dcfb9c2cb4c465400078c072a1fab,step 7 output: SKHASH input and output files
+02-data/focal_mechanisms_2015_2021/ml/vmodel.txt,1173,0b663a677461b5ad2bf8e42ef505403af6ae81ff18fa39cb56c12f63919cfc39,step 7 output: SKHASH input and output files
+02-data/results/AxialPolCap_polarities_2015_2021.csv,28122022,f96e2b3538f1f9775df5f2b2df8a7dd33ff1061ce9afbdccc215feb3d4fb22b0,"step 8 output: AxialPolCap polarities, one row per pick"
+02-data/section41_agreement.json,631,787a1d1cbd1025588394d2ac7192f7d52057ea5ca7fc0b0af0a1525f56c41050,step 6 output: Section 4.1 statistics
