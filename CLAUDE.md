@@ -84,7 +84,7 @@ parallel pipelines: the **NPY pipeline** (paper workflow) and the
 **01_build_training_dataset.py**
 Reads from `Template_divide.mat`; fits a lognormal distribution to per-station
 empirical SNR values; augments each template to reach ~15,000 samples per
-station; applies cubic-spline time shifts (Normal(0, sigma=2 samples at 200 Hz));
+station; applies cubic-spline time shifts (Normal(0, sigma=2 samples at 100 Hz, i.e. 0.02 s));
 center-crops 200→64 samples; max-normalizes; stratified 80/10/10 split;
 saves to `02-data/K_aug/TMSF_Tra_001/`.
 
@@ -133,7 +133,7 @@ Defined via `build_polarPicker()` in each training script.  It is a
 **multi-output model** with a shared encoder:
 
 - **Input**: 64-sample seismic waveform window (Z-component, P-arrival
-  ±32 samples), shape `(64, 1)`
+  ±32 samples at 100 Hz, i.e. ±0.32 s), shape `(64, 1)`
 - **Encoder**: Conv1D(32,32) → Dropout → BN → MaxPool(2) → Conv1D(8,16) →
   BN → MaxPool(2) → output shape `(16, 8)`
 - **Decoder** (autoencoder branch): Conv1D → BN → UpSample → Conv1D → BN →
@@ -149,7 +149,8 @@ reconstruction.
 ## Data Conventions
 
 **Raw data**: Per-station MATLAB `.mat` struct files with fields:
-- `W_{STA}`: waveform (200 samples at 200 Hz)
+- `W_{STA}`: waveform (200 samples at 100 Hz, P arrival ±1 s; filtered at 200 Hz,
+  then resampled to 100 Hz)
 - `Man_{STA}` or `Po_{STA}`: manual polarity label (-1 = Negative, +1 = Positive)
 
 **Converted NPY files** (per station, saved in the active data subdirectory):
@@ -201,7 +202,7 @@ FM_ML/
       TMSF_Tra_002/           # H5 pipeline training output (train_dataset.h5)
       TMSF_Val_002/           # H5 pipeline val output (val_dataset.h5)
     H_noi/
-      H_Noise_200.mat         # Noise waveforms (200 samples, 200 Hz)
+      H_Noise_200.mat         # Noise waveforms (200 samples, 100 Hz)
       H_noise_dB20_snrValue.mat  # Empirical per-station SNR distributions
   03-figs/                    # Output figures (confusion matrices, ROC curves, manuscript PNGs)
     LOSO_010/                 # LOSO confusion matrices
