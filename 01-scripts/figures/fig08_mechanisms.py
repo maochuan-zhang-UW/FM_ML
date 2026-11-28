@@ -1,4 +1,6 @@
-"""Fig. 8: composite focal mechanisms from CC (a-c) and AxialPolCap (d-f)
+"""Python counterpart of Fig. 8, drawn from the SKHASH mechanisms of step 7 (the
+manuscript figure is drawn by fig08_mechanisms.m from the published HASH
+mechanisms): composite focal mechanisms from CC (a-c) and AxialPolCap (d-f)
 polarities before, during and after the 2015 eruption, and the Kagan angle
 between the two mechanisms of each cluster (g-i).
 
@@ -75,7 +77,7 @@ def beachball(ax, lon, lat, sdr, colour, aspect):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--quality", default="AB", help="mechanism quality grades kept for both methods")
-    ap.add_argument("--out", default=str(ROOT / "03-figs" / "GJI_Figure08.png"))
+    ap.add_argument("--out", default=str(ROOT / "03-figs" / "GJI_Figure08_python.png"))
     a = ap.parse_args()
     df = pd.read_csv(ROOT / "02-data" / "focal_mechanisms_2015_2021" / "mechanisms.csv", parse_dates=["time"])
     df = df[df.kagan.notna() & df.quality_cc.isin(list(a.quality)) & df.quality_ml.isin(list(a.quality))

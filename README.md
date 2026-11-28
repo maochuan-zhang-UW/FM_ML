@@ -12,7 +12,7 @@ Maochuan Zhang¹\*, Marine Denolle², William S. D. Wilcock¹, Felix Waldhauser�
 
 \* Corresponding author: mczhang8@uw.edu
 
-Manuscript submitted to *Geophysical Journal International*.
+Manuscript in preparation for *Geophysical Journal International*.
 
 ---
 
@@ -203,7 +203,8 @@ Section 4 retains predictions with confidence ≥ 0.95.
 
 ## Manuscript figures
 
-All figures are drawn in Python by the scripts in `01-scripts/figures/`.
+The figures are drawn by the scripts in `01-scripts/figures/`, in Python except Fig. 8,
+which is drawn in MATLAB.
 
 | Manuscript | File in `03-figs/` | Produced by |
 |---|---|---|
@@ -211,7 +212,7 @@ All figures are drawn in Python by the scripts in `01-scripts/figures/`.
 | Figure 2 | `GJI_Figure02.png` | `fig02_03_S1_S4.py` |
 | Figure 3 | `GJI_Figure03.png` | `fig02_03_S1_S4.py` |
 | Figures 4–7, S3 | `GJI_Figure04.png` – `GJI_Figure07.png`, `GJI_FigureS3.png` | `fig04_07_S3_training_strategies.py` |
-| Figure 8 | `GJI_Figure08.png` | `fig08_mechanisms.py` |
+| Figure 8 | `GJI_Figure08.png` | `fig08_mechanisms.m` (MATLAB) |
 | Figure 9 | `GJI_Figure09.png` | schematic, drawn separately |
 | Figure S1 | `GJI_FigureS1.png` | `fig02_03_S1_S4.py` |
 | Figure S2 | `GJI_FigureS2.jpg` | architecture diagram, modified from Chakraborty et al. (2022) |
@@ -224,6 +225,14 @@ All figures are drawn in Python by the scripts in `01-scripts/figures/`.
 Figs 3 and S1 and Table S2 read `03-figs/benchmark_confusion_matrix.csv`, written by
 `benchmark/score_benchmark.py`; run that first. The cross-correlation row is a constant:
 its inputs are not in the data archive (see `benchmark/provenance/README.md`).
+
+Fig. 8 shows the 1,363 clusters whose CC and AxialPolCap mechanisms are both quality A
+or B and classified as normal, reverse or strike-slip by both. It reads
+`03-figs/fig08_published_mechanisms.csv`, the 3,145 paired HASH mechanisms with their
+Kagan angles (made by `figures/provenance/export_fig08_published_mechanisms.m`), and
+runs with `matlab -batch "run('01-scripts/figures/fig08_mechanisms.m')"`.
+`fig08_mechanisms.py` draws the same panels from the SKHASH mechanisms of step 7 and
+writes `GJI_Figure08_python.png`.
 
 Each script writes its `GJI_*` file into `03-figs/`. The values plotted in Figs 4–7 are
 in `03-figs/training_strategy_numbers.json`.
@@ -252,7 +261,7 @@ intermediate files), the pretrained PolarCAP weights, and the manuscript sources
 ## Environment
 
 Everything runs in Python 3.10 with TensorFlow 2.16.2 and Keras 3.11.3
-(`environment.yml`); no MATLAB is needed:
+(`environment.yml`); MATLAB is needed only to redraw Fig. 8:
 
 ```bash
 conda env create -f environment.yml
@@ -282,7 +291,7 @@ determinations produced in this study are at
 <http://axial.ocean.washington.edu/FocalMechanisms.html>. The input data of this
 repository (`data_manifest.csv`) and the results of steps 5–8 (`results_manifest.csv`,
 including the AxialPolCap polarities and the focal mechanisms) are archived on Zenodo:
-DOI to be added on release.
+<https://doi.org/10.5281/zenodo.24615225>.
 Focal mechanisms are computed with SKHASH (Skoumal et al. 2024;
 <https://code.usgs.gov/esc/SKHASH>).
 
